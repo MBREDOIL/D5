@@ -1,0 +1,10 @@
+pyrogram>=2.0.0
+motor>=3.1.0
+apscheduler>=3.10.0
+yt-dlp>=2023.7.6
+aiohttp>=3.8.4
+aiofiles>=23.1.0
+python-dotenv>=1.0.0
+beautifulsoup4>=4.12.2
+lxml>=4.9.2
+python-magic>=0.4.27
