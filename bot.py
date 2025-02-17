@@ -34,10 +34,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
 MAX_MESSAGE_LENGTH = 4096
 TIMEZONE = "Asia/Kolkata"
-MAX_TRACKED_PER_USER = 15
+MAX_TRACKED_PER_USER = 30
 SUPPORTED_EXTENSIONS = {
     'pdf': ['.pdf'],
     'image': ['.jpg', '.jpeg', '.png', '.webp'],
@@ -165,7 +165,7 @@ class URLTrackerBot:
             if night_mode:
                 trigger = AndTrigger([
                     trigger,
-                    CronTrigger(hour='6-22', timezone=TIMEZONE)
+                    CronTrigger(hour='9-22', timezone=TIMEZONE)
                 ])
 
             self.scheduler.add_job(
@@ -310,42 +310,10 @@ class URLTrackerBot:
                 content = await f.read()
             await async_os.remove(file_path)
 
-            urls = []
-            for line in content.split('\n'):
-                line = line.strip()
-                if line:
-                    decoded_url = unquote(line).replace('%20', ' ')
-                    urls.append(decoded_url)
-
-            if not urls:
                 return await message.reply("No valid URLs found in document")
 
-            added = []
-            for url in urls:
-                try:
-                    parsed = urlparse(url)
-                    if not parsed.scheme:
-                        url = f"http://{url}"
-                    
-                    await MongoDB.urls.update_one(
-                        {'user_id': message.from_user.id, 'url': url},
-                        {'$setOnInsert': {
-                            'name': f"Imported-{hashlib.md5(url.encode()).hexdigest()[:6]}",
-                            'interval': 360,
-                            'night_mode': False,
-                            'sent_hashes': [],
-                            'created_at': datetime.now()
-                        }},
-                        upsert=True
-                    )
-                    added.append(url)
-                except Exception as e:
-                    logger.error(f"Error adding URL {url}: {str(e)}")
-
-            await message.reply(f"Added {len(added)} URLs from document")
-            
-        except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
+         
+ 
 
     # ------------------- Callback Handlers ------------------- #
     async def callback_handler(self, client: Client, query: CallbackQuery):
@@ -384,7 +352,7 @@ class URLTrackerBot:
             # Reschedule job
             trigger = IntervalTrigger(minutes=tracked['interval'])
             if new_mode:
-                trigger = AndTrigger([trigger, CronTrigger(hour='6-22')])
+                trigger = AndTrigger([trigger, CronTrigger(hour='9-22')])
 
             self.scheduler.reschedule_job(
                 job_id=f"{user_id}_{hashlib.md5(url.encode()).hexdigest()}",
@@ -445,11 +413,13 @@ class URLTrackerBot:
             "📌 **Admin Commands:**\n"
             "`/addsudo <user_id>` - Add sudo user\n"
             "`/authchat` - Authorize current chat\n\n"
+            "`/removesudo <user_id>` - Remove sudo user\n"
+            "`/authchat` - Unauthorize current chat\n\n"
             "⚙️ **Features:**\n"
-            "- Night Mode (6AM-10PM only)\n"
-            "- Bulk import via TXT files\n"
-            "- File size limit: 50MB\n"
-            "- Max tracked URLs: 15/user"
+            "- Night Mode (9AM-10PM only)\n"
+            "- =?Bulk import via TXT files\n"
+            "- File size limit: 2GB\n"
+            "- Max tracked URLs: 30/user"
         )
         await message.reply(help_text)
 
