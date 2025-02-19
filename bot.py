@@ -960,10 +960,14 @@ class URLTrackerBot:
         logger.info("Bot stopped gracefully")
 
 
+
 if __name__ == "__main__":
     bot = URLTrackerBot()
     try:
-        asyncio.run(bot.start())
-        asyncio.get_event_loop().run_forever()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(bot.start())
+        loop.run_forever()
     except KeyboardInterrupt:
-        asyncio.run(bot.stop())
+        loop.run_until_complete(bot.stop())
+    finally:
+        loop.close()
