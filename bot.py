@@ -520,244 +520,244 @@ class URLTrackerBot:
             
             if not tracked:
                 return await message.reply("You have no tracked URLs")
-
-            response = []
-            for doc in tracked:
-                keyboard = InlineKeyboardMarkup([[
-                    InlineKeyboardButton(
-                        "🌙 Toggle Night Mode",
-                        callback_data=f"night_{user_id}_{doc['url']}"
-                    ),
-                    InlineKeyboardButton(
-                        "❌ Delete",
-                        callback_data=f"delete_{user_id}_{doc['url']}"
+                
+                response = []
+                for doc in tracked:
+                    keyboard = InlineKeyboardMarkup([[
+                        InlineKeyboardButton(
+                            "🌙 Toggle Night Mode",
+                            callback_data=f"night_{user_id}_{doc['url']}"
+                        ),
+                        InlineKeyboardButton(
+                            "❌ Delete",
+                            callback_data=f"delete_{user_id}_{doc['url']}"
+                        )
+                    ]])
+                
+                    entry = (
+                        f"📛 Name: {doc.get('name', 'Unnamed')}\n"
+                        f"🔗 URL: {doc['url']}\n"
+                        f"⏱ Interval: {doc['interval']} minutes\n"
+                        f"🌙 Night Mode: {'ON' if doc.get('night_mode') else 'OFF'}"
                     )
-                ]])
                 
-                entry = (
-                    f"📛 Name: {doc.get('name', 'Unnamed')}\n"
-                    f"🔗 URL: {doc['url']}\n"
-                    f"⏱ Interval: {doc['interval']} minutes\n"
-                    f"🌙 Night Mode: {'ON' if doc.get('night_mode') else 'OFF'}"
-                )
-                
-                await message.reply(entry, reply_markup=keyboard)
+                    await message.reply(entry, reply_markup=keyboard)
             
-            await message.reply(f"Total tracked URLs: {len(tracked)}/{MAX_TRACKED_PER_USER}")
+                await message.reply(f"Total tracked URLs: {len(tracked)}/{MAX_TRACKED_PER_USER}")
 
-        except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
+            except Exception as e:
+                await message.reply(f"❌ Error: {str(e)}")
 
     # Sudo Commands
-    async def sudo_add_handler(self, client: Client, message: Message):
-        if message.from_user.id != int(os.getenv("OWNER_ID")):
-            return await message.reply("❌ Owner only command!")
+        async def sudo_add_handler(self, client: Client, message: Message):
+            if message.from_user.id != int(os.getenv("OWNER_ID")):
+                return await message.reply("❌ Owner only command!")
 
-        try:
-            user_id = int(message.command[1])
-            await MongoDB.sudo.update_one(
-                {'user_id': user_id},
-                {'$set': {'user_id': user_id}},
-                upsert=True
-            )
-            await message.reply(f"✅ Added sudo user: {user_id}")
-        except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
+            try:
+                user_id = int(message.command[1])
+                await MongoDB.sudo.update_one(
+                    {'user_id': user_id},
+                    {'$set': {'user_id': user_id}},
+                    upsert=True
+                )
+                await message.reply(f"✅ Added sudo user: {user_id}")
+            except Exception as e:
+                await message.reply(f"❌ Error: {str(e)}")
 
-    async def sudo_remove_handler(self, client: Client, message: Message):
-        if message.from_user.id != int(os.getenv("OWNER_ID")):
-            return await message.reply("❌ Owner only command!")
+        async def sudo_remove_handler(self, client: Client, message: Message):
+            if message.from_user.id != int(os.getenv("OWNER_ID")):
+                return await message.reply("❌ Owner only command!")
 
-        try:
-            user_id = int(message.command[1])
-            result = await MongoDB.sudo.delete_one({'user_id': user_id})
-            if result.deleted_count > 0:
-                await message.reply(f"❌ Removed sudo user: {user_id}")
-            else:
-                await message.reply("User not in sudo list")
-        except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
+            try:
+                user_id = int(message.command[1])
+                result = await MongoDB.sudo.delete_one({'user_id': user_id})
+                if result.deleted_count > 0:
+                    await message.reply(f"❌ Removed sudo user: {user_id}")
+                else:
+                    await message.reply("User not in sudo list")
+            except Exception as e:
+                await message.reply(f"❌ Error: {str(e)}")
 
     # Auth Chat Commands
-    async def auth_chat_handler(self, client: Client, message: Message):
-        if message.from_user.id != int(os.getenv("OWNER_ID")):
-            return await message.reply("❌ Owner only command!")
+        async def auth_chat_handler(self, client: Client, message: Message):
+            if message.from_user.id != int(os.getenv("OWNER_ID")):
+                return await message.reply("❌ Owner only command!")
 
-        try:
-            chat_id = message.chat.id
-            await MongoDB.authorized.update_one(
-                {'chat_id': chat_id},
-                {'$set': {'chat_id': chat_id}},
-                upsert=True
-            )
-            await message.reply("✅ Chat authorized successfully")
-        except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
+            try:
+                chat_id = message.chat.id
+                await MongoDB.authorized.update_one(
+                    {'chat_id': chat_id},
+                    {'$set': {'chat_id': chat_id}},
+                    upsert=True
+                )
+                await message.reply("✅ Chat authorized successfully")
+            except Exception as e:
+                await message.reply(f"❌ Error: {str(e)}")
 
-    async def unauth_chat_handler(self, client: Client, message: Message):
-        if message.from_user.id != int(os.getenv("OWNER_ID")):
-            return await message.reply("❌ Owner only command!")
+        async def unauth_chat_handler(self, client: Client, message: Message):
+            if message.from_user.id != int(os.getenv("OWNER_ID")):
+                return await message.reply("❌ Owner only command!")
 
-        try:
-            chat_id = message.chat.id
-            result = await MongoDB.authorized.delete_one({'chat_id': chat_id})
-            if result.deleted_count > 0:
-                await message.reply("❌ Chat authorization removed")
-            else:
-                await message.reply("Chat not in authorized list")
-        except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
+            try:
+                chat_id = message.chat.id
+                result = await MongoDB.authorized.delete_one({'chat_id': chat_id})
+                if result.deleted_count > 0:
+                    await message.reply("❌ Chat authorization removed")
+                else:
+                    await message.reply("Chat not in authorized list")
+            except Exception as e:
+                await message.reply(f"❌ Error: {str(e)}")
 
     # Documents Handler
-    async def list_documents(client, message):
-        """Handle /documents command"""
+        async def list_documents(client, message):
+            """Handle /documents command"""
         # ... implementation of list_documents ...
 
-    def extract_documents(html_content, base_url):
-        """Extract document links from HTML"""
-        soup = BeautifulSoup(html_content, 'lxml')
-        document_extensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt']
-        documents = []
+        def extract_documents(html_content, base_url):
+            """Extract document links from HTML"""
+            soup = BeautifulSoup(html_content, 'lxml')
+            document_extensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt']
+            documents = []
 
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            encoded_href = requests_utils.requote_uri(href)
-            absolute_url = urljoin(base_url, encoded_href)
-            link_text = link.text.strip()
+            for link in soup.find_all('a', href=True):
+                href = link['href']
+                encoded_href = requests_utils.requote_uri(href)
+                absolute_url = urljoin(base_url, encoded_href)
+                link_text = link.text.strip()
 
-            if any(absolute_url.lower().endswith(ext) for ext in document_extensions):
-                if not link_text:
-                    filename = os.path.basename(absolute_url)
-                    link_text = os.path.splitext(filename)[0]
-                documents.append({
-                    'name': link_text,
-                    'url': absolute_url
-                })
+                if any(absolute_url.lower().endswith(ext) for ext in document_extensions):
+                    if not link_text:
+                        filename = os.path.basename(absolute_url)
+                        link_text = os.path.splitext(filename)[0]
+                    documents.append({
+                        'name': link_text,
+                        'url': absolute_url
+                    })
 
-        return list({doc['url']: doc for doc in documents}.values())
+            return list({doc['url']: doc for doc in documents}.values())
 
-    async def create_document_file(url, documents):
-        """Create TXT file with documents list"""
-        domain = get_domain(url)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{domain}_documents_{timestamp}.txt"
+        async def create_document_file(url, documents):
+            """Create TXT file with documents list"""
+            domain = get_domain(url)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{domain}_documents_{timestamp}.txt"
 
-        with open(filename, 'w', encoding='utf-8') as f:
-            for doc in documents:
-                f.write(f"{doc['name']} {doc['url']}\n\n")
+            with open(filename, 'w', encoding='utf-8') as f:
+                for doc in documents:
+                    f.write(f"{doc['name']} {doc['url']}\n\n")
 
-        return filename
+            return filename
 
-    async def check_website_updates(client):
-        """Check for website updates"""
+        async def check_website_updates(client):
+            """Check for website updates"""
         # ... implementation of check_website_updates ...
 
     # Callback Handlers
-    async def callback_handler(self, client: Client, query: CallbackQuery):
-        try:
-            data = query.data.split('_')
-            action = data[0]
+        async def callback_handler(self, client: Client, query: CallbackQuery):
+            try:
+                data = query.data.split('_')
+                action = data[0]
 
-            if action == 'night':
-                await self.nightmode_toggle(client, query)
-            elif action == 'delete':
-                await self.delete_entry(client, query)
+                if action == 'night':
+                    await self.nightmode_toggle(client, query)
+                elif action == 'delete':
+                    await self.delete_entry(client, query)
 
-        except Exception as e:
-            logger.error(f"Callback error: {str(e)}")
-            await query.answer("Error processing request")
+            except Exception as e:
+                logger.error(f"Callback error: {str(e)}")
+                await query.answer("Error processing request")
 
-    async def nightmode_toggle(self, client: Client, query: CallbackQuery):
-        try:
-            _, user_id, url = query.data.split('_', 2)
-            user_id = int(user_id)
+        async def nightmode_toggle(self, client: Client, query: CallbackQuery):
+            try:
+                _, user_id, url = query.data.split('_', 2)
+                user_id = int(user_id)
             
-            tracked = await MongoDB.urls.find_one({
-                'user_id': user_id,
-                'url': url
-            })
+                tracked = await MongoDB.urls.find_one({
+                    'user_id': user_id,
+                    'url': url
+                })
             
-            if not tracked:
-                return await query.answer("Entry not found", show_alert=True)
+                if not tracked:
+                    return await query.answer("Entry not found", show_alert=True)
             
-            new_mode = not tracked['night_mode']
-            await MongoDB.urls.update_one(
-                {'_id': tracked['_id']},
-                {'$set': {'night_mode': new_mode}}
-            )
+                new_mode = not tracked['night_mode']
+                await MongoDB.urls.update_one(
+                    {'_id': tracked['_id']},
+                    {'$set': {'night_mode': new_mode}}
+                )
 
-            trigger = IntervalTrigger(minutes=tracked['interval'])
-            if new_mode:
-                trigger = AndTrigger([trigger, CronTrigger(hour='9-22')])
+                trigger = IntervalTrigger(minutes=tracked['interval'])
+                if new_mode:
+                    trigger = AndTrigger([trigger, CronTrigger(hour='9-22')])
 
-            self.scheduler.reschedule_job(
-                job_id=f"{user_id}_{hashlib.md5(url.encode()).hexdigest()}",
-                trigger=trigger
-            )
+                self.scheduler.reschedule_job(
+                    job_id=f"{user_id}_{hashlib.md5(url.encode()).hexdigest()}",
+                    trigger=trigger
+                )
 
-            await query.edit_message_text(
-                f"🌙 Night Mode {'Enabled' if new_mode else 'Disabled'}\n"
-                f"📛 Name: {tracked.get('name', 'Unnamed')}\n"
-                f"🔗 URL: {url}"
-            )
-            await query.answer()
-        except Exception as e:
-            logger.error(f"Night mode error: {str(e)}")
-            await query.answer("Error toggling night mode", show_alert=True)
+                await query.edit_message_text(
+                    f"🌙 Night Mode {'Enabled' if new_mode else 'Disabled'}\n"
+                    f"📛 Name: {tracked.get('name', 'Unnamed')}\n"
+                    f"🔗 URL: {url}"
+                )
+                await query.answer()
+            except Exception as e:
+                logger.error(f"Night mode error: {str(e)}")
+                await query.answer("Error toggling night mode", show_alert=True)
 
-    async def delete_entry(self, client: Client, query: CallbackQuery):
-        try:
-            _, user_id, url = query.data.split('_', 2)
-            user_id = int(user_id)
+        async def delete_entry(self, client: Client, query: CallbackQuery):
+            try:
+                _, user_id, url = query.data.split('_', 2)
+                user_id = int(user_id)
             
-            result = await MongoDB.urls.delete_one({
-                'user_id': user_id,
-                'url': url
-            })
+                result = await MongoDB.urls.delete_one({
+                    'user_id': user_id,
+                    'url': url
+                })
             
-            if result.deleted_count > 0:
-                self.scheduler.remove_job(f"{user_id}_{hashlib.md5(url.encode()).hexdigest()}")
-                await query.edit_message_text("❌ Entry deleted successfully")
-            else:
-                await query.answer("Entry not found", show_alert=True)
-        except Exception as e:
-            logger.error(f"Delete error: {str(e)}")
-            await query.answer("Error deleting entry", show_alert=True)
+                if result.deleted_count > 0:
+                    self.scheduler.remove_job(f"{user_id}_{hashlib.md5(url.encode()).hexdigest()}")
+                    await query.edit_message_text("❌ Entry deleted successfully")
+                else:
+                    await query.answer("Entry not found", show_alert=True)
+            except Exception as e:
+                logger.error(f"Delete error: {str(e)}")
+                await query.answer("Error deleting entry", show_alert=True)
 
     # Start & Help Commands
-    async def start_handler(self, client: Client, message: Message):
-        await message.reply(
-            "🤖 **URL Tracker Bot**\n\n"
-            "Monitor websites for new files and changes!\n\n"
-            "🔹 Supported Formats:\n"
-            "- PDF, Images, Audio, Video\n\n"
-            "📌 **Main Commands:**\n"
-            "/track - Start tracking a URL\n"
-            "/list - Show tracked URLs\n"
-            "/help - Detailed help guide"
-        )
+        async def start_handler(self, client: Client, message: Message):
+            await message.reply(
+                "🤖 **URL Tracker Bot**\n\n"
+                "Monitor websites for new files and changes!\n\n"
+                "🔹 Supported Formats:\n"
+                "- PDF, Images, Audio, Video\n\n"
+                "📌 **Main Commands:**\n"
+                "/track - Start tracking a URL\n"
+                "/list - Show tracked URLs\n"
+                "/help - Detailed help guide"
+            )
 
-    async def help_handler(self, client: Client, message: Message):
-        help_text = (
-            "🆘 **Advanced Help Guide**\n\n"
-            "📌 **Tracking Commands:**\n"
-            "`/track <name> <url> <interval> [night]`\n"
-            "Example: `/track MySite https://example.com 60 night`\n\n"
-            "📌 **Management Commands:**\n"
-            "`/untrack <url>` - Stop tracking\n"
-            "`/list` - Show all tracked URLs\n\n"
-            "📌 **Admin Commands:**\n"
-            "`/addsudo <user_id>` - Add sudo user\n"
-            "`/authchat` - Authorize current chat\n\n"
-            "`/removesudo <user_id>` - Remove sudo user\n"
-            "`/authchat` - Unauthorize current chat\n\n"
-            "⚙️ **Features:**\n"
-            "- Night Mode (9AM-10PM only)\n"
-            "- Bulk import via TXT files\n"
-            "- File size limit: 2GB\n"
-            "- Max tracked URLs: 30/user"
-        )
-        await message.reply(help_text)
+        async def help_handler(self, client: Client, message: Message):
+            help_text = (
+                "🆘 **Advanced Help Guide**\n\n"
+                "📌 **Tracking Commands:**\n"
+                "`/track <name> <url> <interval> [night]`\n"
+                "Example: `/track MySite https://example.com 60 night`\n\n"
+                "📌 **Management Commands:**\n"
+                "`/untrack <url>` - Stop tracking\n"
+                "`/list` - Show all tracked URLs\n\n"
+                "📌 **Admin Commands:**\n"
+                "`/addsudo <user_id>` - Add sudo user\n"
+                "`/authchat` - Authorize current chat\n\n"
+                "`/removesudo <user_id>` - Remove sudo user\n"
+                "`/authchat` - Unauthorize current chat\n\n"
+                "⚙️ **Features:**\n"
+                "- Night Mode (9AM-10PM only)\n"
+                "- Bulk import via TXT files\n"
+                "- File size limit: 2GB\n"
+                "- Max tracked URLs: 30/user"
+            )
+            await message.reply(help_text)
 
     # Remaining Core Functions
     # (get_webpage_content, ytdl_download, direct_download, 
@@ -765,205 +765,205 @@ class URLTrackerBot:
     #  start, stop methods same as previous code)
 
     # Enhanced Web Monitoring
-    async def get_webpage_content(self, url: str) -> Tuple[str, List[Dict]]:
-        try:
-            async with self.http.get(url, timeout=30) as resp:
-                content = await resp.text()
-                soup = BeautifulSoup(content, 'lxml')
+        async def get_webpage_content(self, url: str) -> Tuple[str, List[Dict]]:
+            try:
+                async with self.http.get(url, timeout=30) as resp:
+                    content = await resp.text()
+                    soup = BeautifulSoup(content, 'lxml')
 
-                resources = []
-                seen_hashes = set()
+                    resources = []
+                    seen_hashes = set()
 
-                for tag in soup.find_all(['a', 'img', 'audio', 'video', 'source']):
-                    resource_url = None
-                    if tag.name == 'a' and (href := tag.get('href')):
-                        resource_url = unquote(urljoin(url, href))
-                    elif (src := tag.get('src')):
-                        resource_url = unquote(urljoin(url, src))
+                    for tag in soup.find_all(['a', 'img', 'audio', 'video', 'source']):
+                        resource_url = None
+                        if tag.name == 'a' and (href := tag.get('href')):
+                            resource_url = unquote(urljoin(url, href))
+                        elif (src := tag.get('src')):
+                            resource_url = unquote(urljoin(url, src))
 
-                    if resource_url:
-                        try:
-                            async with self.http.get(resource_url) as r:
-                                file_content = await r.read()
-                                file_hash = hashlib.md5(file_content).hexdigest()
-                                if file_hash in seen_hashes:
-                                    continue
-                                seen_hashes.add(file_hash)
-                        except:
-                            file_hash = hashlib.md5(resource_url.encode()).hexdigest()
+                        if resource_url:
+                            try:
+                                async with self.http.get(resource_url) as r:
+                                    file_content = await r.read()
+                                    file_hash = hashlib.md5(file_content).hexdigest()
+                                    if file_hash in seen_hashes:
+                                        continue
+                                    seen_hashes.add(file_hash)
+                            except:
+                                file_hash = hashlib.md5(resource_url.encode()).hexdigest()
 
-                        ext = os.path.splitext(resource_url)[1].lower()
-                        for file_type, extensions in SUPPORTED_EXTENSIONS.items():
-                            if ext in extensions:
-                                resources.append({
-                                    'url': resource_url,
-                                    'type': file_type,
-                                    'hash': file_hash
-                                })
-                                break
+                            ext = os.path.splitext(resource_url)[1].lower()
+                            for file_type, extensions in SUPPORTED_EXTENSIONS.items():
+                                if ext in extensions:
+                                    resources.append({
+                                        'url': resource_url,
+                                        'type': file_type,
+                                        'hash': file_hash
+                                    })
+                                    break
 
-                return content, resources
-        except Exception as e:
-            logger.error(f"Web monitoring error: {str(e)}")
-            return "", []
+                    return content, resources
+            except Exception as e:
+                logger.error(f"Web monitoring error: {str(e)}")
+                return "", []
 
     # YT-DLP Enhanced Integration
-    async def ytdl_download(self, url: str) -> Optional[str]:
-        try:
-            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
-                info = await asyncio.to_thread(ydl.extract_info, url, download=False)
+        async def ytdl_download(self, url: str) -> Optional[str]:
+            try:
+                with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
+                    info = await asyncio.to_thread(ydl.extract_info, url, download=False)
 
-                if 'entries' in info:
-                    info = info['entries'][0]
+                    if 'entries' in info:
+                        info = info['entries'][0]
 
-                filename = ydl.prepare_filename(info)
-                if os.path.exists(filename):
+                    filename = ydl.prepare_filename(info)
+                    if os.path.exists(filename):
+                        return filename
+
+                    await asyncio.to_thread(ydl.download, [url])
                     return filename
+            except yt_dlp.utils.DownloadError as e:
+                logger.error(f"YT-DLP Download Error: {str(e)}")
+                return await self.direct_download(url)
+            except Exception as e:
+                logger.error(f"YT-DLP General Error: {str(e)}")
+                return None
 
-                await asyncio.to_thread(ydl.download, [url])
-                return filename
-        except yt_dlp.utils.DownloadError as e:
-            logger.error(f"YT-DLP Download Error: {str(e)}")
-            return await self.direct_download(url)
-        except Exception as e:
-            logger.error(f"YT-DLP General Error: {str(e)}")
-            return None
+        async def direct_download(self, url: str) -> Optional[str]:
+            try:
+                async with self.http.get(url) as resp:
+                    if resp.status != 200:
+                        return None
 
-    async def direct_download(self, url: str) -> Optional[str]:
-        try:
-            async with self.http.get(url) as resp:
-                if resp.status != 200:
-                    return None
+                    content = await resp.read()
+                    if len(content) > MAX_FILE_SIZE:
+                        return None
 
-                content = await resp.read()
-                if len(content) > MAX_FILE_SIZE:
-                    return None
+                    file_ext = os.path.splitext(url)[1].split('?')[0][:4]
+                    file_name = f"downloads/{hashlib.md5(content).hexdigest()}{file_ext}"
 
-                file_ext = os.path.splitext(url)[1].split('?')[0][:4]
-                file_name = f"downloads/{hashlib.md5(content).hexdigest()}{file_ext}"
+                    async with aiofiles.open(file_name, 'wb') as f:
+                        await f.write(content)
 
-                async with aiofiles.open(file_name, 'wb') as f:
-                    await f.write(content)
-
-                return file_name
-        except Exception as e:
-            logger.error(f"Direct download failed: {str(e)}")
-            return None
+                    return file_name
+            except Exception as e:
+                logger.error(f"Direct download failed: {str(e)}")
+                return None
 
     # Message Handling
-    async def safe_send_message(self, user_id: int, text: str, **kwargs):
-        try:
-            if len(text) <= MAX_MESSAGE_LENGTH:
-                await self.app.send_message(user_id, text, **kwargs)
-            else:
-                parts = [text[i:i+MAX_MESSAGE_LENGTH] for i in range(0, len(text), MAX_MESSAGE_LENGTH)]
-                for part in parts:
-                    await self.app.send_message(user_id, part, **kwargs)
-                    await asyncio.sleep(1)
-        except Exception as e:
-            logger.error(f"Message sending failed: {str(e)}")
+        async def safe_send_message(self, user_id: int, text: str, **kwargs):
+            try:
+                if len(text) <= MAX_MESSAGE_LENGTH:
+                    await self.app.send_message(user_id, text, **kwargs)
+                else:
+                    parts = [text[i:i+MAX_MESSAGE_LENGTH] for i in range(0, len(text), MAX_MESSAGE_LENGTH)]
+                    for part in parts:
+                        await self.app.send_message(user_id, part, **kwargs)
+                        await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"Message sending failed: {str(e)}")
 
     # Tracking Core Logic
-    async def check_updates(self, user_id: int, url: str):
-        try:
-            tracked_data = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
-            if not tracked_data:
-                return
+        async def check_updates(self, user_id: int, url: str):
+            try:
+                tracked_data = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
+                if not tracked_data:
+                    return
 
-            current_content, new_resources = await self.get_webpage_content(url)
-            previous_hash = tracked_data.get('content_hash', '')
-            current_hash = hashlib.md5(current_content.encode()).hexdigest()
+                current_content, new_resources = await self.get_webpage_content(url)
+                previous_hash = tracked_data.get('content_hash', '')
+                current_hash = hashlib.md5(current_content.encode()).hexdigest()
 
-            if current_hash != previous_hash or new_resources:
-                text_changes = f"🔄 Website Updated: {url}\n" + \
-                             f"📅 Change detected at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                if current_hash != previous_hash or new_resources:
+                    text_changes = f"🔄 Website Updated: {url}\n" + \
+                                 f"📅 Change detected at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
 
-                await self.safe_send_message(user_id, text_changes)
+                    await self.safe_send_message(user_id, text_changes)
 
-                sent_hashes = []
-                for resource in new_resources:
-                    if resource['hash'] not in tracked_data.get('sent_hashes', []):
-                        if await self.send_media(user_id, resource, tracked_data):
-                            sent_hashes.append(resource['hash'])
+                    sent_hashes = []
+                    for resource in new_resources:
+                        if resource['hash'] not in tracked_data.get('sent_hashes', []):
+                            if await self.send_media(user_id, resource, tracked_data):
+                                sent_hashes.append(resource['hash'])
 
-                update_data = {
-                    'content_hash': current_hash,
-                    'last_checked': datetime.now()
-                }
+                    update_data = {
+                        'content_hash': current_hash,
+                        'last_checked': datetime.now()
+                    }
 
-                if sent_hashes:
-                    update_data['$push'] = {'sent_hashes': {'$each': sent_hashes}}
+                    if sent_hashes:
+                        update_data['$push'] = {'sent_hashes': {'$each': sent_hashes}}
 
-                await MongoDB.urls.update_one(
-                    {'_id': tracked_data['_id']},
-                    {'$set': update_data}
-                )
+                    await MongoDB.urls.update_one(
+                        {'_id': tracked_data['_id']},
+                        {'$set': update_data}
+                    )
 
-        except Exception as e:
-            logger.error(f"Update check failed for {url}: {str(e)}")
-            await self.app.send_message(user_id, f"⚠️ Error checking updates for {url}")
+            except Exception as e:
+                logger.error(f"Update check failed for {url}: {str(e)}")
+                await self.app.send_message(user_id, f"⚠️ Error checking updates for {url}")
 
     # Media Sending
-    async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
-        try:
-            caption = (
-                f"📁 {tracked_data.get('name', 'Unnamed')}\n"
-                f"🔗 Source: {tracked_data['url']}\n"
-                f"📥 Direct URL: {resource['url']}"
-            )
+        async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
+            try:
+                caption = (
+                    f"📁 {tracked_data.get('name', 'Unnamed')}\n"
+                    f"🔗 Source: {tracked_data['url']}\n"
+                    f"📥 Direct URL: {resource['url']}"
+                )
 
-            file_path = await self.ytdl_download(resource['url'])
-            if not file_path:
-                file_path = await self.direct_download(resource['url'])
+                file_path = await self.ytdl_download(resource['url'])
+                if not file_path:
+                    file_path = await self.direct_download(resource['url'])
 
-            if not file_path:
+                if not file_path:
+                    return False
+
+                file_size = os.path.getsize(file_path)
+                if file_size > MAX_FILE_SIZE:
+                    logger.warning(f"File too big: {file_size} bytes")
+                    return False
+
+                send_methods = {
+                    'pdf': self.app.send_document,
+                    'image': self.app.send_photo,
+                    'audio': self.app.send_audio,
+                    'video': self.app.send_video
+                }
+
+                method = send_methods.get(resource['type'], self.app.send_document)
+                await method(
+                    user_id,
+                    file_path,
+                    caption=caption[:1024],
+                    parse_mode=enums.ParseMode.HTML
+                )
+
+                await async_os.remove(file_path)
+                return True
+
+            except Exception as e:
+                logger.error(f"Media send failed: {str(e)}")
                 return False
-
-            file_size = os.path.getsize(file_path)
-            if file_size > MAX_FILE_SIZE:
-                logger.warning(f"File too big: {file_size} bytes")
-                return False
-
-            send_methods = {
-                'pdf': self.app.send_document,
-                'image': self.app.send_photo,
-                'audio': self.app.send_audio,
-                'video': self.app.send_video
-            }
-
-            method = send_methods.get(resource['type'], self.app.send_document)
-            await method(
-                user_id,
-                file_path,
-                caption=caption[:1024],
-                parse_mode=enums.ParseMode.HTML
-            )
-
-            await async_os.remove(file_path)
-            return True
-
-        except Exception as e:
-            logger.error(f"Media send failed: {str(e)}")
-            return False
 
     # Lifecycle Management
-    async def start(self):
-        await self.app.start()
-        self.scheduler.start()
-        logger.info("Bot started successfully")
-        await self.app.send_message(int(os.getenv("OWNER_ID")), "🤖 Bot Started Successfully")
+        async def start(self):
+            await self.app.start()
+            self.scheduler.start()
+            logger.info("Bot started successfully")
+            await self.app.send_message(int(os.getenv("OWNER_ID")), "🤖 Bot Started Successfully")
 
-    async def stop(self):
-        await self.app.stop()
-        await self.http.close()
-        self.scheduler.shutdown()
-        logger.info("Bot stopped gracefully")
+        async def stop(self):
+            await self.app.stop()
+            await self.http.close()
+            self.scheduler.shutdown()
+            logger.info("Bot stopped gracefully")
 
 
-if __name__ == "__main__":
-    bot = URLTrackerBot()
-    try:
-        asyncio.run(bot.start())
-        asyncio.get_event_loop().run_forever()
-    except KeyboardInterrupt:
-        asyncio.run(bot.stop())
+    if __name__ == "__main__":
+        bot = URLTrackerBot()
+        try:
+            asyncio.run(bot.start())
+            asyncio.get_event_loop().run_forever()
+        except KeyboardInterrupt:
+            asyncio.run(bot.stop())
