@@ -1,5 +1,421 @@
 import os
 import re
+import csv
+import json
+import difflib
+import logging
+import asyncio
+import aiohttp
+import aiofiles
+import hashlib
+import yt_dlp
+from urllib.parse import urlparse, urljoin, unquote
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional, Tuple, Union
+
+from pyrogram import Client, filters, enums
+from pyrogram.types import (
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery,
+    Document
+)
+from motor.motor_asyncio import AsyncIOMotorClient
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.combining import AndTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
+from bs4 import BeautifulSoup
+from aiofiles import os as async_os
+
+# Configure logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Configuration
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_MESSAGE_LENGTH = 4096
+TIMEZONE = "Asia/Kolkata"
+MAX_TRACKED_PER_USER = 15
+ARCHIVE_RETENTION_DAYS = 30
+STATS_CLEANUP_HOURS = 6
+
+# MongoDB Configuration
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = "url_tracker_bot"
+
+# Initialize MongoDB Client
+mongo_client = AsyncIOMotorClient(MONGO_URI)
+db = mongo_client[DB_NAME]
+
+class MongoDB:
+    """MongoDB collections"""
+    users = db['users']
+    urls = db['tracked_urls']
+    sudo = db['sudo_users']
+    authorized = db['authorized_chats']
+    stats = db['statistics']
+    archives = db['archives']
+    filters = db['filters']
+    notifications = db['notifications']
+
+class URLTrackerBot:
+    def __init__(self):
+        self.app = Client(
+            "url_tracker_bot",
+            api_id=int(os.getenv("API_ID")),
+            api_hash=os.getenv("API_HASH"),
+            bot_token=os.getenv("BOT_TOKEN")
+        )
+        self.scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+        self.http = aiohttp.ClientSession()
+        self.ydl_opts = {
+            'format': 'best',
+            'quiet': True,
+            'noprogress': True,
+            'nocheckcertificate': True,
+            'max_filesize': MAX_FILE_SIZE,
+            'outtmpl': 'downloads/%(id)s.%(ext)s'
+        }
+        self.initialize_handlers()
+        self.create_downloads_dir()
+        self.schedule_maintenance_jobs()
+
+    def schedule_maintenance_jobs(self):
+        # Archive cleanup
+        self.scheduler.add_job(
+            self.cleanup_old_archives,
+            trigger=CronTrigger(hour=0, minute=0),
+            name="archive_cleanup"
+        )
+        
+        # Stats aggregation
+        self.scheduler.add_job(
+            self.aggregate_statistics,
+            trigger=IntervalTrigger(hours=STATS_CLEANUP_HOURS),
+            name="stats_aggregation"
+        )
+
+    # ------------------- Advanced Filtering ------------------- #
+    async def apply_filters(self, resource: Dict, user_id: int) -> bool:
+        """Apply custom filters to resources"""
+        filter_data = await MongoDB.filters.find_one({'user_id': user_id})
+        if not filter_data:
+            return True
+
+        # File type filtering
+        if filter_data.get('file_types'):
+            if resource['type'] not in filter_data['file_types']:
+                return False
+
+        # Size filtering
+        size_ranges = filter_data.get('size_ranges', [])
+        if size_ranges:
+            resource_size = await self.get_resource_size(resource['url'])
+            if not any(start <= resource_size <= end for (start, end) in size_ranges):
+                return False
+
+        # Regex filtering
+        if filter_data.get('regex_pattern'):
+            try:
+                pattern = re.compile(filter_data['regex_pattern'])
+                if not pattern.search(resource['url']):
+                    return False
+            except re.error:
+                logger.error("Invalid regex pattern")
+
+        return True
+
+    async def get_resource_size(self, url: str) -> int:
+        """Get resource size without downloading"""
+        try:
+            async with self.http.head(url) as resp:
+                return int(resp.headers.get('Content-Length', 0))
+        except:
+            return 0
+
+    # ------------------- Export/Import System ------------------- #
+    async def export_data(self, user_id: int, format: str) -> str:
+        """Export tracked URLs to specified format"""
+        tracked = await MongoDB.urls.find({'user_id': user_id}).to_list(None)
+        
+        if format == 'json':
+            data = json.dumps([{
+                'name': item.get('name'),
+                'url': item['url'],
+                'interval': item['interval'],
+                'filters': item.get('filters', {}),
+                'notification_settings': item.get('notification_settings', {})
+            } for item in tracked], indent=2)
+            
+            filename = f"export_{user_id}.json"
+            async with aiofiles.open(filename, 'w') as f:
+                await f.write(data)
+            
+            return filename
+        
+        elif format == 'csv':
+            filename = f"export_{user_id}.csv"
+            async with aiofiles.open(filename, 'w') as f:
+                writer = csv.DictWriter(f, fieldnames=['name', 'url', 'interval'])
+                await writer.writeheader()
+                for item in tracked:
+                    await writer.writerow({
+                        'name': item.get('name', ''),
+                        'url': item['url'],
+                        'interval': item['interval']
+                    })
+            return filename
+        
+        raise ValueError("Unsupported format")
+
+    async def import_data(self, user_id: int, file_path: str, format: str):
+        """Import tracked URLs from file"""
+        async with aiofiles.open(file_path, 'r') as f:
+            content = await f.read()
+        
+        if format == 'json':
+            data = json.loads(content)
+        elif format == 'csv':
+            data = []
+            reader = csv.DictReader(content.splitlines())
+            for row in reader:
+                data.append(row)
+        else:
+            raise ValueError("Unsupported format")
+        
+        imported_count = 0
+        for item in data:
+            try:
+                await MongoDB.urls.update_one(
+                    {'user_id': user_id, 'url': item['url']},
+                    {'$set': {
+                        'name': item.get('name', f"Imported-{hashlib.md5(item['url'].encode()).hexdigest()[:6]}"),
+                        'interval': item['interval'],
+                        'filters': item.get('filters', {}),
+                        'notification_settings': item.get('notification_settings', {})
+                    }},
+                    upsert=True
+                )
+                imported_count += 1
+            except Exception as e:
+                logger.error(f"Import error: {str(e)}")
+        
+        return imported_count
+
+    # ------------------- Statistics System ------------------- #
+    async def track_statistics(self, event_type: str, user_id: int, url: str, success: bool = True):
+        """Record statistics for analysis"""
+        await MongoDB.stats.update_one(
+            {'user_id': user_id, 'url': url},
+            {'$inc': {f'stats.{event_type}.{"success" if success else "failure"}': 1}},
+            upsert=True
+        )
+
+    async def get_statistics(self, user_id: int) -> Dict:
+        """Get aggregated statistics for user"""
+        pipeline = [
+            {'$match': {'user_id': user_id}},
+            {'$group': {
+                '_id': None,
+                'total_tracked': {'$sum': 1},
+                'success_downloads': {'$sum': '$stats.downloads.success'},
+                'failed_downloads': {'$sum': '$stats.downloads.failure'},
+                'uptime_percentage': {
+                    '$avg': {
+                        '$cond': [
+                            {'$eq': ['$stats.checks.success', 0]},
+                            0,
+                            {'$divide': ['$stats.checks.success', {'$add': ['$stats.checks.success', '$stats.checks.failure']}]}
+                        ]
+                    }
+                }
+            }}
+        ]
+        
+        result = await MongoDB.stats.aggregate(pipeline).to_list(1)
+        return result[0] if result else {}
+
+    # ------------------- Archive System ------------------- #
+    async def create_archive(self, user_id: int, url: str, content: str):
+        """Create historical archive of webpage content"""
+        await MongoDB.archives.insert_one({
+            'user_id': user_id,
+            'url': url,
+            'content': content,
+            'timestamp': datetime.now()
+        })
+
+    async def get_archives(self, user_id: int, url: str) -> List[Dict]:
+        """Retrieve archives for specific URL"""
+        return await MongoDB.archives.find({
+            'user_id': user_id,
+            'url': url
+        }).sort('timestamp', -1).to_list(None)
+
+    # ------------------- Content Diff System ------------------- #
+    async def generate_diff(self, old_content: str, new_content: str) -> str:
+        """Generate human-readable diff between versions"""
+        diff = difflib.unified_diff(
+            old_content.splitlines(),
+            new_content.splitlines(),
+            fromfile='Previous',
+            tofile='Current',
+            lineterm=''
+        )
+        return '\n'.join(diff)[:MAX_MESSAGE_LENGTH]
+
+    # ------------------- Notification System ------------------- #
+    async def send_notification(self, user_id: int, url: str, changes: str):
+        """Send customized notification based on user preferences"""
+        settings = await MongoDB.notifications.find_one({'user_id': user_id}) or {}
+        
+        message_format = settings.get('format', 'text')
+        frequency = settings.get('frequency', 'immediate')
+        
+        if message_format == 'text':
+            await self.app.send_message(user_id, f"🔔 Update detected for {url}:\n{changes}")
+        elif message_format == 'html':
+            await self.app.send_message(user_id, f"<b>Update detected</b> for {url}:\n<pre>{changes}</pre>", parse_mode=enums.ParseMode.HTML)
+
+    # ------------------- Maintenance Jobs ------------------- #
+    async def cleanup_old_archives(self):
+        """Cleanup archives older than retention period"""
+        cutoff = datetime.now() - timedelta(days=ARCHIVE_RETENTION_DAYS)
+        await MongoDB.archives.delete_many({'timestamp': {'$lt': cutoff}})
+        logger.info("Cleaned up old archives")
+
+    async def aggregate_statistics(self):
+        """Aggregate statistics for better performance"""
+        # Implement your aggregation logic here
+        logger.info("Statistics aggregation completed")
+
+    # ------------------- Updated Tracking Logic ------------------- #
+    async def check_updates(self, user_id: int, url: str):
+        try:
+            tracked_data = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
+            if not tracked_data:
+                return
+
+            current_content, new_resources = await self.get_webpage_content(url)
+            await self.create_archive(user_id, url, current_content)
+            
+            previous_hash = tracked_data.get('content_hash', '')
+            current_hash = hashlib.md5(current_content.encode()).hexdigest()
+            
+            if current_hash != previous_hash:
+                diff_content = await self.generate_diff(
+                    tracked_data.get('content', ''),
+                    current_content
+                )
+                await self.send_notification(user_id, url, diff_content)
+                
+                await self.track_statistics('content_changes', user_id, url)
+
+            filtered_resources = []
+            for resource in new_resources:
+                if await self.apply_filters(resource, user_id):
+                    filtered_resources.append(resource)
+
+            if filtered_resources:
+                sent_hashes = []
+                for resource in filtered_resources:
+                    if await self.send_media(user_id, resource, tracked_data):
+                        sent_hashes.append(resource['hash'])
+                        await self.track_statistics('downloads', user_id, url, success=True)
+                    else:
+                        await self.track_statistics('downloads', user_id, url, success=False)
+                
+                update_data = {
+                    'content_hash': current_hash,
+                    'last_checked': datetime.now()
+                }
+                
+                if sent_hashes:
+                    update_data['$push'] = {'sent_hashes': {'$each': sent_hashes}}
+                
+                await MongoDB.urls.update_one(
+                    {'_id': tracked_data['_id']},
+                    {'$set': update_data}
+                )
+                
+        except Exception as e:
+            logger.error(f"Update check failed for {url}: {str(e)}")
+            await self.track_statistics('checks', user_id, url, success=False)
+
+    # ------------------- New Command Handlers ------------------- #
+    async def filter_handler(self, client: Client, message: Message):
+        """Handle filter configuration"""
+        pass  # Implement filter configuration logic
+
+    async def export_handler(self, client: Client, message: Message):
+        """Handle export commands"""
+        try:
+            format = message.command[1].lower()
+            if format not in ['json', 'csv']:
+                return await message.reply("Invalid format. Use /export json|csv")
+            
+            filename = await self.export_data(message.from_user.id, format)
+            await message.reply_document(filename)
+            await async_os.remove(filename)
+        except Exception as e:
+            await message.reply(f"Export failed: {str(e)}")
+
+    async def stats_handler(self, client: Client, message: Message):
+        """Show statistics dashboard"""
+        try:
+            stats = await self.get_statistics(message.from_user.id)
+            response = (
+                "📊 Statistics Dashboard\n\n"
+                f"Tracked URLs: {stats.get('total_tracked', 0)}\n"
+                f"Success Downloads: {stats.get('success_downloads', 0)}\n"
+                f"Failed Downloads: {stats.get('failed_downloads', 0)}\n"
+                f"Uptime Percentage: {stats.get('uptime_percentage', 0)*100:.2f}%"
+            )
+            await message.reply(response)
+        except Exception as e:
+            await message.reply(f"Failed to get stats: {str(e)}")
+
+    async def archive_handler(self, client: Client, message: Message):
+        """Handle archive commands"""
+        pass  # Implement archive listing/retrieval
+
+    async def notification_handler(self, client: Client, message: Message):
+        """Handle notification settings"""
+        pass  # Implement notification configuration
+
+    # ------------------- Updated Initialization ------------------- #
+    def initialize_handlers(self):
+        handlers = [
+            # Previous handlers
+            (self.filter_handler, 'filter'),
+            (self.export_handler, 'export'),
+            (self.stats_handler, 'stats'),
+            (self.archive_handler, 'archive'),
+            (self.notification_handler, 'notify')
+        ]
+        # Add to existing handlers list
+
+    # Rest of the code remains similar with integration of new features
+    # (Database operations, utility functions, etc.)
+
+async def main():
+    bot = URLTrackerBot()
+    try:
+        await bot.start()
+        await asyncio.Event().wait()
+    except KeyboardInterrupt:
+        await bot.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+import os
+import re
 import logging
 import asyncio
 import aiohttp
@@ -293,7 +709,139 @@ class URLTrackerBot:
 
     # ------------------- Documents Handler ------------------- #
 
-         
+
+    async def list_documents(client, message):
+    """Handle /documents command"""
+    if message.chat.type == "private":
+        if not is_authorized_user(message.from_user.id):
+            await message.reply_text("❌ You are not authorized to use this command.")
+            return
+    elif message.chat.type == "channel":
+        if not is_authorized_channel(message.chat.id):
+            await message.reply_text("❌ This channel is not authorized to use this bot.")
+            return
+    else:
+        await message.reply_text("❌ This command can only be used in private chats or authorized channels.")
+        return
+
+    user_id = str(message.from_user.id or message.chat.id)
+    url = ' '.join(message.command[1:]).strip()
+
+    user_data = load_user_data()
+    if user_id not in user_data or not user_data[user_id]['tracked_urls']:
+        await message.reply_text("❌ You're not tracking any URLs")
+        return
+
+    url_info = next((u for u in user_data[user_id]['tracked_urls'] if u['url'] == url), None)
+    if not url_info:
+        await message.reply_text("❌ This URL is not being tracked")
+        return
+
+    documents = url_info.get('documents', [])
+    if not documents:
+        await message.reply_text(f"ℹ️ No documents found at {url}")
+    else:
+        try:
+            txt_file = await create_document_file(url, documents)
+            await client.send_document(
+                chat_id=user_id,
+                document=txt_file,
+                caption=f"📑 Documents at {url} ({len(documents)})"
+            )
+            os.remove(txt_file)
+        except Exception as e:
+            logger.error(f"Error sending documents list: {e}")
+            await message.reply_text("❌ Error sending documents")
+
+    
+    def extract_documents(html_content, base_url):
+    """Extract document links from HTML"""
+    soup = BeautifulSoup(html_content, 'lxml')
+    document_extensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt']
+    documents = []
+
+    for link in soup.find_all('a', href=True):
+        href = link['href']
+        # Proper URL encoding handling
+        encoded_href = requests_utils.requote_uri(href)
+        absolute_url = urljoin(base_url, encoded_href)
+        link_text = link.text.strip()
+
+        if any(absolute_url.lower().endswith(ext) for ext in document_extensions):
+            # Use link text or filename as document name
+            if not link_text:
+                filename = os.path.basename(absolute_url)
+                link_text = os.path.splitext(filename)[0]
+            documents.append({
+                'name': link_text,
+                'url': absolute_url
+            })
+
+    # Remove duplicates
+    return list({doc['url']: doc for doc in documents}.values())
+
+async def create_document_file(url, documents):
+    """Create TXT file with documents list"""
+    domain = get_domain(url)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{domain}_documents_{timestamp}.txt"
+
+    with open(filename, 'w', encoding='utf-8') as f:
+        for doc in documents:
+            f.write(f"{doc['name']} {doc['url']}\n\n")
+
+    return filename
+
+async def check_website_updates(client):
+    """Check for website updates"""
+    user_data = load_user_data()
+    for user_id, data in user_data.items():
+        for url_info in data['tracked_urls']:
+            url = url_info['url']
+            stored_hash = url_info['hash']
+            stored_documents = url_info['documents']
+
+            current_content = fetch_url_content(url)
+            if not current_content:
+                continue
+
+            current_hash = hashlib.sha256(current_content.encode()).hexdigest()
+            current_documents = extract_documents(current_content, url)
+
+            if current_hash != stored_hash:
+                try:
+                    # General change notification
+                    await client.send_message(
+                        chat_id=user_id,
+                        text=f"🚨 Website changed! {url}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error sending update to {user_id}: {e}")
+
+                # Check for new documents
+                new_docs = [doc for doc in current_documents
+                            if doc not in stored_documents]
+
+                if new_docs:
+                    try:
+                        # Create and send TXT file
+                        txt_file = await create_document_file(url, new_docs)
+                        await client.send_document(
+                            chat_id=user_id,
+                            document=txt_file,
+                            caption=f"📄 New documents found at {url} ({len(new_docs)})"
+                        )
+                        os.remove(txt_file)
+                    except Exception as e:
+                        logger.error(f"Error sending document to {user_id}: {e}")
+
+                    # Update stored data
+                    url_info['documents'] = current_documents
+                    url_info['hash'] = current_hash
+
+    save_user_data(user_data)
+
+    
  
 
     # ------------------- Callback Handlers ------------------- #
