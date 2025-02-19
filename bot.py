@@ -126,15 +126,10 @@ class URLTrackerBot:
                 return await message.reply("Format: /track <name> <url> <interval> [night]")
 
             name = parts[1].strip()
-            raw_url = parts[2].strip()
+            url = parts[2].strip()
             interval = int(parts[3].strip())
             night_mode = len(parts) > 4 and parts[4].lower().strip() == 'night'
 
-            # URL processing
-            url = unquote(raw_url).replace(' ', '%20')
-            parsed = urlparse(url)
-            if not parsed.scheme:
-                url = f"http://{url}"
 
             # Check tracking limits
             tracked_count = await MongoDB.urls.count_documents({'user_id': message.from_user.id})
@@ -297,20 +292,6 @@ class URLTrackerBot:
             await message.reply(f"❌ Error: {str(e)}")
 
     # ------------------- Documents Handler ------------------- #
-    async def documents_handler(self, client: Client, message: Message):
-        if not await self.is_authorized(message):
-            return
-
-        try:
-            if not message.document or not message.document.file_name.endswith('.txt'):
-                return await message.reply("Please send a .txt file")
-
-            file_path = await message.download()
-            async with aiofiles.open(file_path, 'r') as f:
-                content = await f.read()
-            await async_os.remove(file_path)
-
-                return await message.reply("No valid URLs found in document")
 
          
  
