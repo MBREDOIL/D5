@@ -514,7 +514,7 @@ class URLTrackerBot:
 
     # List command
         async def list_handler(self, client: Client, message: Message):
-        try:
+            try:
             user_id = message.from_user.id
             tracked = await MongoDB.urls.find({'user_id': user_id}).to_list(None)
             
