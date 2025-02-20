@@ -612,6 +612,38 @@ class URLTrackerBot:
             await message.reply(f"❌ Error: {str(e)}")
 
     # Documents Handler
+
+
+    async def documents_handler(self, client: Client, message: Message):
+        """Handle /documents command"""
+        if not await self.is_authorized(message):
+            return await message.reply("❌ Authorization failed!")
+
+        user_id = message.from_user.id
+        url = ' '.join(message.command[1:]).strip()
+
+        tracked = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
+        if not tracked:
+            return await message.reply("URL not found in your tracked list")
+
+        documents = tracked.get('documents', [])
+        if not documents:
+            return await message.reply(f"ℹ️ No documents found for {url}")
+
+        try:
+            txt_file = await self.create_document_file(url, documents)
+            await client.send_document(
+                chat_id=user_id,
+                document=txt_file,
+                caption=f"📑 Documents at {url} ({len(documents)})"
+            )
+            await async_os.remove(txt_file)
+        except Exception as e:
+            logger.error(f"Error sending documents list: {e}")
+            await message.reply("❌ Error sending documents")
+
+
+    
     async def list_documents(client, message):
         """Handle /documents command"""
         # ... implementation of list_documents ...
