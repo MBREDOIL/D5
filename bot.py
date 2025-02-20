@@ -528,18 +528,7 @@ class URLTrackerBot:
                 return await message.reply("You have no tracked URLs")
 
             response = []
-            for doc in tracked:
-                keyboard = InlineKeyboardMarkup([[
-                    InlineKeyboardButton(
-                        "🌙 Toggle Night Mode",
-                        callback_data=f"night_{user_id}_{doc['url']}"
-                    ),
-                    InlineKeyboardButton(
-                        "❌ Delete",
-                        callback_data=f"delete_{user_id}_{doc['url']}"
-                    )
-                ]])
-                
+            for doc in tracked:   
                 entry = (
                     f"📛 Name: {doc.get('name', 'Unnamed')}\n"
                     f"🔗 URL: {doc['url']}\n"
@@ -547,7 +536,7 @@ class URLTrackerBot:
                     f"🌙 Night Mode: {'ON' if doc.get('night_mode') else 'OFF'}"
                 )
                 
-                await message.reply(entry, reply_markup=keyboard)
+                await message.reply(entry)
             
             await message.reply(f"Total tracked URLs: {len(tracked)}/{MAX_TRACKED_PER_USER}")
 
