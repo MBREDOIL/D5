@@ -843,6 +843,33 @@ class URLTrackerBot:
             return "", []
 
     # YT-DLP Enhanced Integration
+
+
+    async def ytdl_handler(self, client: Client, message: Message):
+        """Handle /dl command"""
+        if not await self.is_authorized(message):
+            return await message.reply("❌ Authorization failed!")
+
+        url = ' '.join(message.command[1:]).strip()
+        if not url:
+            return await message.reply("❌ Please provide a URL to download")
+
+        try:
+            file_path = await self.ytdl_download(url)
+            if not file_path:
+                return await message.reply("❌ Download failed")
+
+            await client.send_document(
+                chat_id=message.chat.id,
+                document=file_path,
+                caption=f"📥 Downloaded from {url}"
+            )
+            await async_os.remove(file_path)
+        except Exception as e:
+            logger.error(f"Download error: {str(e)}")
+            await message.reply("❌ Error downloading the file")
+
+
     async def ytdl_download(self, url: str) -> Optional[str]:
         try:
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
