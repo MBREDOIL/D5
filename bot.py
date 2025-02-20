@@ -561,8 +561,8 @@ class URLTrackerBot:
                     upsert=True
                 )
                 await message.reply(f"✅ Added sudo user: {user_id}")
-            except Exception as e:
-                await message.reply(f"❌ Error: {str(e)}")
+        except Exception as e:
+            await message.reply(f"❌ Error: {str(e)}")
 
     
 
@@ -598,8 +598,8 @@ class URLTrackerBot:
                     upsert=True
                 )
                 await message.reply("✅ Chat authorized successfully")
-            except Exception as e:
-                await message.reply(f"❌ Error: {str(e)}")
+        except Exception as e:
+            await message.reply(f"❌ Error: {str(e)}")
 
     async def unauth_chat_handler(self, client: Client, message: Message):
         if message.from_user.id != int(os.getenv("OWNER_ID")):
