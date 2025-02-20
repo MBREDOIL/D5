@@ -679,77 +679,6 @@ class URLTrackerBot:
         """Check for website updates"""
         # ... implementation of check_website_updates ...
 
-    # Callback Handlers
-    async def callback_handler(self, client: Client, query: CallbackQuery):
-        try:
-            data = query.data.split('_')
-            action = data[0]
-
-            if action == 'night':
-                await self.nightmode_toggle(client, query)
-            elif action == 'delete':
-                await self.delete_entry(client, query)
-
-        except Exception as e:
-            logger.error(f"Callback error: {str(e)}")
-            await query.answer("Error processing request")
-
-    async def nightmode_toggle(self, client: Client, query: CallbackQuery):
-        try:
-            _, user_id, url = query.data.split('_', 2)
-            user_id = int(user_id)
-            
-            tracked = await MongoDB.urls.find_one({
-                'user_id': user_id,
-                'url': url
-            })
-            
-            if not tracked:
-                return await query.answer("Entry not found", show_alert=True)
-            
-            new_mode = not tracked['night_mode']
-            await MongoDB.urls.update_one(
-                {'_id': tracked['_id']},
-                {'$set': {'night_mode': new_mode}}
-            )
-
-            trigger = IntervalTrigger(minutes=tracked['interval'])
-            if new_mode:
-                trigger = AndTrigger([trigger, CronTrigger(hour='9-22')])
-
-            self.scheduler.reschedule_job(
-                job_id=f"{user_id}_{hashlib.md5(url.encode()).hexdigest()}",
-                trigger=trigger
-            )
-
-            await query.edit_message_text(
-                f"🌙 Night Mode {'Enabled' if new_mode else 'Disabled'}\n"
-                f"📛 Name: {tracked.get('name', 'Unnamed')}\n"
-                f"🔗 URL: {url}"
-            )
-            await query.answer()
-        except Exception as e:
-            logger.error(f"Night mode error: {str(e)}")
-            await query.answer("Error toggling night mode", show_alert=True)
-
-    async def delete_entry(self, client: Client, query: CallbackQuery):
-        try:
-            _, user_id, url = query.data.split('_', 2)
-            user_id = int(user_id)
-            
-            result = await MongoDB.urls.delete_one({
-                'user_id': user_id,
-                'url': url
-            })
-            
-            if result.deleted_count > 0:
-                self.scheduler.remove_job(f"{user_id}_{hashlib.md5(url.encode()).hexdigest()}")
-                await query.edit_message_text("❌ Entry deleted successfully")
-            else:
-                await query.answer("Entry not found", show_alert=True)
-        except Exception as e:
-            logger.error(f"Delete error: {str(e)}")
-            await query.answer("Error deleting entry", show_alert=True)
 
     # Start & Help Commands
     async def start_handler(self, client: Client, message: Message):
@@ -863,26 +792,47 @@ class URLTrackerBot:
 
 
     async def ytdl_download(self, url: str) -> Optional[str]:
-        try:
+        try
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
                 info = await asyncio.to_thread(ydl.extract_info, url, download=False)
 
                 if 'entries' in info:
                     info = info['entries'][0]
 
+                # Extract the file extension from the URL
+                parsed_url = urlparse(url)
+                file_extension = os.path.splitext(parsed_url.path)[1]
+
+                # If no extension, get it from the content type
+                if not file_extension:
+                    response = requests.head(url)
+                    content_type = response.headers.get('content-type')
+                    if content_type:
+                        file_extension = mimetypes.guess_extension(content_type)
+                    if not file_extension:
+                        file_extension = '.unknown'
+
+                # Prepare the filename with the correct extension
                 filename = ydl.prepare_filename(info)
+                new_filename = os.path.splitext(filename)[0] + file_extension
+
                 if os.path.exists(filename):
-                    return filename
+                    os.rename(filename, new_filename)
+                    return new_filename
 
                 await asyncio.to_thread(ydl.download, [url])
-                return filename
+
+                if os.path.exists(filename):
+                    os.rename(filename, new_filename)
+            
+                return new_filename
         except yt_dlp.utils.DownloadError as e:
             logger.error(f"YT-DLP Download Error: {str(e)}")
             return await self.direct_download(url)
         except Exception as e:
             logger.error(f"YT-DLP General Error: {str(e)}")
             return None
-
+        
     async def direct_download(self, url: str) -> Optional[str]:
         try:
             async with self.http.get(url) as resp:
