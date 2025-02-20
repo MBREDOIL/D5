@@ -1025,10 +1025,11 @@ class URLTrackerBot:
         self.scheduler.shutdown()
         logger.info("Bot stopped gracefully")
 
+
 if __name__ == "__main__":
     bot = URLTrackerBot()
     try:
         asyncio.run(bot.start())
-        asyncio.get_event_loop().run_forever()
+        # asyncio.get_event_loop().run_forever() is not needed after asyncio.run()
     except KeyboardInterrupt:
         asyncio.run(bot.stop())
