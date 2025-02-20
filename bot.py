@@ -550,14 +550,21 @@ class URLTrackerBot:
 
         try:
             user_id = int(message.command[1])
-            await MongoDB.sudo.update_one(
-                {'user_id': user_id},
-                {'$set': {'user_id': user_id}},
-                upsert=True
-            )
-            await message.reply(f"✅ Added sudo user: {user_id}")
-        except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
+            existing_user = await MongoDB.sudo.find_one({'user_id': user_id})
+        
+            if existing_user:
+                await message.reply(f"⚠️ User {user_id} is already a sudo user!")
+            else:
+                await MongoDB.sudo.update_one(
+                    {'user_id': user_id},
+                    {'$set': {'user_id': user_id}},
+                    upsert=True
+                )
+                await message.reply(f"✅ Added sudo user: {user_id}")
+            except Exception as e:
+                await message.reply(f"❌ Error: {str(e)}")
+
+    
 
     async def sudo_remove_handler(self, client: Client, message: Message):
         if message.from_user.id != int(os.getenv("OWNER_ID")):
@@ -580,14 +587,19 @@ class URLTrackerBot:
 
         try:
             chat_id = int(message.command[1])
-            await MongoDB.authorized.update_one(
-                {'chat_id': chat_id},
-                {'$set': {'chat_id': chat_id}},
-                upsert=True
-            )
-            await message.reply("✅ Chat authorized successfully")
-        except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
+            existing_user = await MongoDB.sudo.find_one({'chat_id': chat_id})
+        
+            if existing_user:
+                await message.reply(f"⚠️ User {chat_id} is already a authorized!")
+            else:
+                await MongoDB.authorized.update_one(
+                    {'chat_id': chat_id},
+                    {'$set': {'chat_id': chat_id}},
+                    upsert=True
+                )
+                await message.reply("✅ Chat authorized successfully")
+            except Exception as e:
+                await message.reply(f"❌ Error: {str(e)}")
 
     async def unauth_chat_handler(self, client: Client, message: Message):
         if message.from_user.id != int(os.getenv("OWNER_ID")):
