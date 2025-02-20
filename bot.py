@@ -372,7 +372,7 @@ class URLTrackerBot:
             if format not in ['json', 'csv']:
                 return await message.reply("Invalid format. Use /export json|csv")
             
-            filename = await self.export_data(message.from_user.id, format)
+            filename = await self.export_data(message.chat.id, format)
             await message.reply_document(filename)
             await async_os.remove(filename)
         except Exception as e:
@@ -381,7 +381,7 @@ class URLTrackerBot:
     async def stats_handler(self, client: Client, message: Message):
         """Show statistics dashboard"""
         try:
-            stats = await self.get_statistics(message.from_user.id)
+            stats = await self.get_statistics(message.chat.id)
             response = (
                 "📊 Statistics Dashboard\n\n"
                 f"Tracked URLs: {stats.get('total_tracked', 0)}\n"
@@ -455,7 +455,7 @@ class URLTrackerBot:
             night_mode = len(parts) > 4 and parts[4].lower().strip() == 'night'
 
             # Check tracking limits
-            tracked_count = await MongoDB.urls.count_documents({'user_id': message.from_user.id})
+            tracked_count = await MongoDB.urls.count_documents({'user_id': message.chat.id})
             if tracked_count >= MAX_TRACKED_PER_USER:
                 return await message.reply(f"❌ Tracking limit reached ({MAX_TRACKED_PER_USER} URLs)")
 
