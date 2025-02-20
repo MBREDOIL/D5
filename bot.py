@@ -417,8 +417,7 @@ class URLTrackerBot:
             (self.documents_handler, 'documents'),
             (self.ytdl_handler, 'dl'),
             (self.start_handler, 'start'),
-            (self.help_handler, 'help'),
-            (self.callback_handler, None)
+            (self.help_handler, 'help')
         ]
         
         for handler, command in handlers:
