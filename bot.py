@@ -792,7 +792,7 @@ class URLTrackerBot:
 
 
     async def ytdl_download(self, url: str) -> Optional[str]:
-        try
+        try:
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
                 info = await asyncio.to_thread(ydl.extract_info, url, download=False)
 
