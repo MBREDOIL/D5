@@ -466,7 +466,7 @@ class URLTrackerBot:
 
             # Store in DB
             await MongoDB.urls.update_one(
-                {'user_id': message.from_user.id, 'url': url},
+                {'user_id': message.chat.id, 'url': url},
                 {'$set': {
                     'name': name,
                     'interval': interval,
@@ -489,8 +489,8 @@ class URLTrackerBot:
             self.scheduler.add_job(
                 self.check_updates,
                 trigger=trigger,
-                args=[message.from_user.id, url],
-                id=f"{message.from_user.id}_{hashlib.md5(url.encode()).hexdigest()}",
+                args=[message.chat.id, url],
+                id=f"{message.chat.id}_{hashlib.md5(url.encode()).hexdigest()}",
                 max_instances=2
             )
 
@@ -506,7 +506,7 @@ class URLTrackerBot:
                 return await message.reply("❌ Authorization failed!")
 
             url = unquote(message.command[1].strip())
-            user_id = message.from_user.id
+            user_id = message.chat.id
 
             result = await MongoDB.urls.delete_one({'user_id': user_id, 'url': url})
             if result.deleted_count > 0:
@@ -521,7 +521,7 @@ class URLTrackerBot:
     # List command
     async def list_handler(self, client: Client, message: Message):
         try:
-            user_id = message.from_user.id
+            user_id = message.chat.id
             tracked = await MongoDB.urls.find({'user_id': user_id}).to_list(None)
             
             if not tracked:
@@ -623,7 +623,7 @@ class URLTrackerBot:
         if not await self.is_authorized(message):
             return await message.reply("❌ Authorization failed!")
 
-        user_id = message.from_user.id
+        user_id = message.from_chat.id
         url = ' '.join(message.command[1:]).strip()
 
         tracked = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
@@ -718,10 +718,10 @@ class URLTrackerBot:
             "`/addsudo <user_id>` - Add sudo user\n"
             "`/authchat` - Authorize current chat\n\n"
             "`/removesudo <user_id>` - Remove sudo user\n"
-            "`/authchat` - Unauthorize current chat\n\n"
+            "`/unauthchat` - Unauthorize current chat\n\n"
             "⚙️ **Features:**\n"
             "- Night Mode (9AM-10PM only)\n"
-            "- Bulk import via TXT files\n"
+            "- TXT files Generator\n"
             "- File size limit: 2GB\n"
             "- Max tracked URLs: 30/user"
         )
