@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Union
 
 from pyrogram import Client, filters, enums
+from pyrogram.handlers import MessageHandler
 from pyrogram.types import (
     Message,
     InlineKeyboardMarkup,
