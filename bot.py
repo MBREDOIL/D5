@@ -78,7 +78,7 @@ class URLTrackerBot:
             bot_token=os.getenv("BOT_TOKEN")
         )
         self.scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-        self.http = aiohttp.ClientSession()
+        self.http = None  # Initialize as None
         self.ydl_opts = {
             'format': 'best',
             'quiet': True,
@@ -90,6 +90,9 @@ class URLTrackerBot:
         self.initialize_handlers()
         self.create_downloads_dir()
         self.schedule_maintenance_jobs()
+
+    async def initialize_http_client(self):
+        self.http = aiohttp.ClientSession()
 
     def schedule_maintenance_jobs(self):
         # Archive cleanup
@@ -947,27 +950,25 @@ class URLTrackerBot:
             return False
 
     # Lifecycle Management
+
     async def start(self):
         await self.app.start()
+        await self.initialize_http_client()  # Initialize the HTTP client
         self.scheduler.start()
         logger.info("Bot started successfully")
         await self.app.send_message(int(os.getenv("OWNER_ID")), "🤖 Bot Started Successfully")
 
     async def stop(self):
         await self.app.stop()
-        await self.http.close()
+        if self.http:
+            await self.http.close()
         self.scheduler.shutdown()
         logger.info("Bot stopped gracefully")
-
-
 
 if __name__ == "__main__":
     bot = URLTrackerBot()
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(bot.start())
-        loop.run_forever()
+        asyncio.run(bot.start())
+        asyncio.get_event_loop().run_forever()
     except KeyboardInterrupt:
-        loop.run_until_complete(bot.stop())
-    finally:
-        loop.close()
+        asyncio.run(bot.stop())
