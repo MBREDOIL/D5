@@ -9,6 +9,7 @@ import aiohttp
 import aiofiles
 import hashlib
 import yt_dlp
+import asyncio
 from urllib.parse import urlparse, urljoin, unquote
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Union
