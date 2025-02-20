@@ -431,7 +431,7 @@ class URLTrackerBot:
 
     # Authorization
     async def is_authorized(self, message: Message) -> bool:
-        if message.chat.type == enums.ChatType.CHANNEL:
+        if message.chat.type in [enums.ChatType.CHANNEL, enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
             return await MongoDB.authorized.find_one({'chat_id': message.chat.id})
         return any([
             await MongoDB.sudo.find_one({'user_id': message.from_user.id}),
