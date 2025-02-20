@@ -579,7 +579,7 @@ class URLTrackerBot:
             return await message.reply("❌ Owner only command!")
 
         try:
-            chat_id = message.chat.id
+            chat_id = int(message.command[1])
             await MongoDB.authorized.update_one(
                 {'chat_id': chat_id},
                 {'$set': {'chat_id': chat_id}},
@@ -594,7 +594,7 @@ class URLTrackerBot:
             return await message.reply("❌ Owner only command!")
 
         try:
-            chat_id = message.chat.id
+            chat_id = int(message.command[1])
             result = await MongoDB.authorized.delete_one({'chat_id': chat_id})
             if result.deleted_count > 0:
                 await message.reply("❌ Chat authorization removed")
@@ -738,19 +738,10 @@ class URLTrackerBot:
                         resource_url = unquote(urljoin(url, src))
 
                     if resource_url:
-                        try:
-                            async with self.http.get(resource_url) as r:
-                                file_content = await r.read()
-                                file_hash = hashlib.md5(file_content).hexdigest()
-                                if file_hash in seen_hashes:
-                                    continue
-                                seen_hashes.add(file_hash)
-                        except:
-                            file_hash = hashlib.md5(resource_url.encode()).hexdigest()
-
                         ext = os.path.splitext(resource_url)[1].lower()
                         for file_type, extensions in SUPPORTED_EXTENSIONS.items():
                             if ext in extensions:
+                                file_hash = hashlib.md5(resource_url.encode()).hexdigest()
                                 resources.append({
                                     'url': resource_url,
                                     'type': file_type,
@@ -763,8 +754,8 @@ class URLTrackerBot:
             logger.error(f"Web monitoring error: {str(e)}")
             return "", []
 
-    # YT-DLP Enhanced Integration
-
+    
+  # YT-DLP Enhanced Integration
 
     async def ytdl_handler(self, client: Client, message: Message):
         """Handle /dl command"""
