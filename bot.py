@@ -10,6 +10,7 @@ import aiofiles
 import hashlib
 import yt_dlp
 import asyncio
+from aiohttp import web
 from urllib.parse import urlparse, urljoin, unquote
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Union
@@ -1012,9 +1013,21 @@ class URLTrackerBot:
 
     # Lifecycle Management
 
+    async def health_check(self, request):
+        return web.Response(text="OK")
+
     async def start(self):
         await self.app.start()
         await self.initialize_http_client()  # Initialize the HTTP client
+
+        # Start the web server for health checks
+        app = web.Application()
+        app.router.add_get('/health', self.health_check)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', 5000)
+        await site.start()
+
         self.scheduler.start()
         logger.info("Bot started successfully")
         await self.app.send_message(int(os.getenv("OWNER_ID")), "🤖 Bot Started Successfully")
@@ -1025,6 +1038,7 @@ class URLTrackerBot:
             await self.http.close()
         self.scheduler.shutdown()
         logger.info("Bot stopped gracefully")
+
 
 
 if __name__ == "__main__":
