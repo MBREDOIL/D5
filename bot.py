@@ -623,7 +623,7 @@ class URLTrackerBot:
         if not await self.is_authorized(message):
             return await message.reply("❌ Authorization failed!")
 
-        user_id = message.from_chat.id
+        user_id = message.chat.id
         url = ' '.join(message.command[1:]).strip()
 
         tracked = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
