@@ -1,7 +1,6 @@
 import os
 import re
-import csv
-import json
+import json 
 import difflib
 import logging
 import asyncio
@@ -20,14 +19,10 @@ from pyrogram import Client, filters, enums
 from pyrogram.handlers import MessageHandler
 from pyrogram.types import (
     Message,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CallbackQuery,
     Document
 )
 from motor.motor_asyncio import AsyncIOMotorClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.combining import AndTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from bs4 import BeautifulSoup
@@ -96,13 +91,6 @@ class URLTrackerBot:
         self.http = aiohttp.ClientSession()
 
     def schedule_maintenance_jobs(self):
-        # Archive cleanup
-        self.scheduler.add_job(
-            self.cleanup_old_archives,
-            trigger=CronTrigger(hour=0, minute=0),
-            name="archive_cleanup"
-        )
-        
         # Stats aggregation
         self.scheduler.add_job(
             self.aggregate_statistics,
@@ -144,6 +132,10 @@ class URLTrackerBot:
         result = await MongoDB.stats.aggregate(pipeline).to_list(1)
         return result[0] if result else {}
 
+    async def aggregate_statistics(self):
+        """Aggregate statistics for better performance"""
+        # Implement your aggregation logic here
+        logger.info("Statistics aggregation completed")
 
     # Content diff system
     async def generate_diff(self, old_content: str, new_content: str) -> str:
@@ -157,12 +149,6 @@ class URLTrackerBot:
         )
         return '\n'.join(diff)[:MAX_MESSAGE_LENGTH]
 
-    # f
-
-    async def aggregate_statistics(self):
-        """Aggregate statistics for better performance"""
-        # Implement your aggregation logic here
-        logger.info("Statistics aggregation completed")
 
     # Updated tracking logic
     async def check_updates(self, user_id: int, url: str):
