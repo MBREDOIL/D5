@@ -425,11 +425,6 @@ class URLTrackerBot:
             await message.reply("❌ Error sending documents")
 
 
-    
-    async def list_documents(client, message):
-        """Handle /documents command"""
-        # ... implementation of list_documents ...
-
     def extract_documents(html_content, base_url):
         """Extract document links from HTML"""
         soup = BeautifulSoup(html_content, 'lxml')
@@ -464,10 +459,6 @@ class URLTrackerBot:
                 f.write(f"{doc['name']} {doc['url']}\n\n")
 
         return filename
-
-    async def check_website_updates(client):
-        """Check for website updates"""
-        # ... implementation of check_website_updates ...
 
 
     # Start & Help Commands
@@ -716,6 +707,7 @@ class URLTrackerBot:
 
 
     # Media Sending
+    
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
         try:
             caption = (
