@@ -111,7 +111,7 @@ class URLTrackerBot:
         # Use bulk writes for better performance if tracking multiple stats
         await MongoDB.stats.update_one(
             {'user_id': user_id, 'url': url},
-            {'$inc': {f'stats.{event_type}.{"success" if success else "failure"}': 1},
+            {'$inc': {f'stats.{event_type}.{"success" if success else "failure"}': 1}},
             upsert=True
         )
 
