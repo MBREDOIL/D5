@@ -69,9 +69,6 @@ class MongoDB:
     sudo = db['sudo_users']
     authorized = db['authorized_chats']
     stats = db['statistics']
-    archives = db['archives']
-    filters = db['filters']
-    notifications = db['notifications']
 
 class URLTrackerBot:
     def __init__(self):
@@ -113,112 +110,6 @@ class URLTrackerBot:
             name="stats_aggregation"
         )
 
-    # Custom filter application
-    async def apply_filters(self, resource: Dict, user_id: int) -> bool:
-        """Apply custom filters to resources"""
-        filter_data = await MongoDB.filters.find_one({'user_id': user_id})
-        if not filter_data:
-            return True
-
-        # File type filtering
-        if filter_data.get('file_types'):
-            if resource['type'] not in filter_data['file_types']:
-                return False
-
-        # Size filtering
-        size_ranges = filter_data.get('size_ranges', [])
-        if size_ranges:
-            resource_size = await self.get_resource_size(resource['url'])
-            if not any(start <= resource_size <= end for (start, end) in size_ranges):
-                return False
-
-        # Regex filtering
-        if filter_data.get('regex_pattern'):
-            try:
-                pattern = re.compile(filter_data['regex_pattern'])
-                if not pattern.search(resource['url']):
-                    return False
-            except re.error:
-                logger.error("Invalid regex pattern")
-
-        return True
-
-    async def get_resource_size(self, url: str) -> int:
-        """Get resource size without downloading"""
-        try:
-            async with self.http.head(url) as resp:
-                return int(resp.headers.get('Content-Length', 0))
-        except:
-            return 0
-
-    # Export/Import system
-    async def export_data(self, user_id: int, format: str) -> str:
-        """Export tracked URLs to specified format"""
-        tracked = await MongoDB.urls.find({'user_id': user_id}).to_list(None)
-        
-        if format == 'json':
-            data = json.dumps([{
-                'name': item.get('name'),
-                'url': item['url'],
-                'interval': item['interval'],
-                'filters': item.get('filters', {}),
-                'notification_settings': item.get('notification_settings', {})
-            } for item in tracked], indent=2)
-            
-            filename = f"export_{user_id}.json"
-            async with aiofiles.open(filename, 'w') as f:
-                await f.write(data)
-            
-            return filename
-        
-        elif format == 'csv':
-            filename = f"export_{user_id}.csv"
-            async with aiofiles.open(filename, 'w') as f:
-                writer = csv.DictWriter(f, fieldnames=['name', 'url', 'interval'])
-                await writer.writeheader()
-                for item in tracked:
-                    await writer.writerow({
-                        'name': item.get('name', ''),
-                        'url': item['url'],
-                        'interval': item['interval']
-                    })
-            return filename
-        
-        raise ValueError("Unsupported format")
-
-    async def import_data(self, user_id: int, file_path: str, format: str):
-        """Import tracked URLs from file"""
-        async with aiofiles.open(file_path, 'r') as f:
-            content = await f.read()
-        
-        if format == 'json':
-            data = json.loads(content)
-        elif format == 'csv':
-            data = []
-            reader = csv.DictReader(content.splitlines())
-            for row in reader:
-                data.append(row)
-        else:
-            raise ValueError("Unsupported format")
-        
-        imported_count = 0
-        for item in data:
-            try:
-                await MongoDB.urls.update_one(
-                    {'user_id': user_id, 'url': item['url']},
-                    {'$set': {
-                        'name': item.get('name', f"Imported-{hashlib.md5(item['url'].encode()).hexdigest()[:6]}"),
-                        'interval': item['interval'],
-                        'filters': item.get('filters', {}),
-                        'notification_settings': item.get('notification_settings', {})
-                    }},
-                    upsert=True
-                )
-                imported_count += 1
-            except Exception as e:
-                logger.error(f"Import error: {str(e)}")
-        
-        return imported_count
 
     # Statistics system
     async def track_statistics(self, event_type: str, user_id: int, url: str, success: bool = True):
@@ -253,22 +144,6 @@ class URLTrackerBot:
         result = await MongoDB.stats.aggregate(pipeline).to_list(1)
         return result[0] if result else {}
 
-    # Archives system
-    async def create_archive(self, user_id: int, url: str, content: str):
-        """Create historical archive of webpage content"""
-        await MongoDB.archives.insert_one({
-            'user_id': user_id,
-            'url': url,
-            'content': content,
-            'timestamp': datetime.now()
-        })
-
-    async def get_archives(self, user_id: int, url: str) -> List[Dict]:
-        """Retrieve archives for specific URL"""
-        return await MongoDB.archives.find({
-            'user_id': user_id,
-            'url': url
-        }).sort('timestamp', -1).to_list(None)
 
     # Content diff system
     async def generate_diff(self, old_content: str, new_content: str) -> str:
@@ -282,25 +157,7 @@ class URLTrackerBot:
         )
         return '\n'.join(diff)[:MAX_MESSAGE_LENGTH]
 
-    # Notification system
-    async def send_notification(self, user_id: int, url: str, changes: str):
-        """Send customized notification based on user preferences"""
-        settings = await MongoDB.notifications.find_one({'user_id': user_id}) or {}
-        
-        message_format = settings.get('format', 'text')
-        frequency = settings.get('frequency', 'immediate')
-        
-        if message_format == 'text':
-            await self.app.send_message(user_id, f"🔔 Update detected for {url}:\n{changes}")
-        elif message_format == 'html':
-            await self.app.send_message(user_id, f"<b>Update detected</b> for {url}:\n<pre>{changes}</pre>", parse_mode=enums.ParseMode.HTML)
-
-    # Maintenance jobs
-    async def cleanup_old_archives(self):
-        """Cleanup archives older than retention period"""
-        cutoff = datetime.now() - timedelta(days=ARCHIVE_RETENTION_DAYS)
-        await MongoDB.archives.delete_many({'timestamp': {'$lt': cutoff}})
-        logger.info("Cleaned up old archives")
+    # f
 
     async def aggregate_statistics(self):
         """Aggregate statistics for better performance"""
@@ -369,22 +226,6 @@ class URLTrackerBot:
             await self.track_statistics('checks', user_id, url, success=False)
 
     # New command handlers
-    async def filter_handler(self, client: Client, message: Message):
-        """Handle filter configuration"""
-        pass  # Implement filter configuration logic
-
-    async def export_handler(self, client: Client, message: Message):
-        """Handle export commands"""
-        try:
-            format = message.command[1].lower()
-            if format not in ['json', 'csv']:
-                return await message.reply("Invalid format. Use /export json|csv")
-            
-            filename = await self.export_data(message.chat.id, format)
-            await message.reply_document(filename)
-            await async_os.remove(filename)
-        except Exception as e:
-            await message.reply(f"Export failed: {str(e)}")
 
     async def stats_handler(self, client: Client, message: Message):
         """Show statistics dashboard"""
@@ -401,21 +242,10 @@ class URLTrackerBot:
         except Exception as e:
             await message.reply(f"Failed to get stats: {str(e)}")
 
-    async def archive_handler(self, client: Client, message: Message):
-        """Handle archive commands"""
-        pass  # Implement archive listing/retrieval
-
-    async def notification_handler(self, client: Client, message: Message):
-        """Handle notification settings"""
-        pass  # Implement notification configuration
 
     def initialize_handlers(self):
         handlers = [
-            (self.filter_handler, 'filter'),
-            (self.export_handler, 'export'),
             (self.stats_handler, 'stats'),
-            (self.archive_handler, 'archive'),
-            (self.notification_handler, 'notify'),
             (self.track_handler, 'track'),
             (self.untrack_handler, 'untrack'),
             (self.list_handler, 'list'),
