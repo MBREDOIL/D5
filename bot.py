@@ -43,7 +43,7 @@ MAX_MESSAGE_LENGTH = 4096
 TIMEZONE = "Asia/Kolkata"
 MAX_TRACKED_PER_USER = 30
 ARCHIVE_RETENTION_DAYS = 30
-STATS_CLEANUP_HOURS = 6
+STATS_CLEANUP_HOURS = 48
 SUPPORTED_EXTENSIONS = {
     'pdf': ['.pdf'],
     'image': ['.jpg', '.jpeg', '.png', '.webp'],
@@ -256,7 +256,7 @@ class URLTrackerBot:
                     'name': name,
                     'interval': interval,
                     'night_mode': night_mode,
-                    'content_hash': hashlib.md5(content.encode()).hexdigest(),
+                    'content_hash': hashlib.sha256(content.encode()).hexdigest(),
                     'sent_hashes': [],
                     'created_at': datetime.now()
                 }},
@@ -290,7 +290,7 @@ class URLTrackerBot:
 
             result = await MongoDB.urls.delete_one({'user_id': user_id, 'url': url})
             if result.deleted_count > 0:
-                url_hash = hashlib.md5(url.encode()).hexdigest()
+                url_hash = hashlib.sha256(url.encode()).hexdigest()
                 self.scheduler.remove_job(f"{user_id}_{url_hash}")
                 await message.reply(f"❌ Stopped tracking: {url}")
             else:
@@ -557,7 +557,7 @@ class URLTrackerBot:
             await client.send_document(
                 chat_id=message.chat.id,
                 document=file_path,
-                caption=f"📥 Downloaded from {url}"
+                caption=f"📥 Downloaded from {url}\n💳: {url_text} "
             )
             await async_os.remove(file_path)
         except Exception as e:
@@ -618,7 +618,7 @@ class URLTrackerBot:
                     return None
 
                 file_ext = os.path.splitext(url)[1].split('?')[0][:4]
-                file_name = f"downloads/{hashlib.md5(content).hexdigest()}{file_ext}"
+                file_name = f"downloads/{hashlib.sha256(content).hexdigest()}{file_ext}"
 
                 async with aiofiles.open(file_name, 'wb') as f:
                     await f.write(content)
@@ -714,6 +714,7 @@ class URLTrackerBot:
         try:
             caption = (
                 f"📁 {tracked_data.get('name', 'Unnamed')}\n"
+                f"💳 Name: {'url_text'}\n"
                 f"🔗 Source: {tracked_data['url']}\n"
                 f"📥 Direct URL: {resource['url']}"
             )
