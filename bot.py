@@ -100,37 +100,57 @@ class URLTrackerBot:
 
 
     # Statistics system
+
     async def track_statistics(self, event_type: str, user_id: int, url: str, success: bool = True):
-        """Record statistics for analysis"""
+        """Record statistics for analysis with validation"""
+        # Validate event type to prevent injection
+        valid_events = {'downloads', 'checks', 'content_changes'}
+        if event_type not in valid_events:
+            raise ValueError(f"Invalid event type: {event_type}")
+    
+        # Use bulk writes for better performance if tracking multiple stats
         await MongoDB.stats.update_one(
             {'user_id': user_id, 'url': url},
-            {'$inc': {f'stats.{event_type}.{"success" if success else "failure"}': 1}},
+            {'$inc': {f'stats.{event_type}.{"success" if success else "failure"}': 1},
             upsert=True
         )
 
     async def get_statistics(self, user_id: int) -> Dict:
-        """Get aggregated statistics for user"""
+        """Get accurate aggregated statistics for user"""
         pipeline = [
             {'$match': {'user_id': user_id}},
             {'$group': {
                 '_id': None,
                 'total_tracked': {'$sum': 1},
-                'success_downloads': {'$sum': '$stats.downloads.success'},
-                'failed_downloads': {'$sum': '$stats.downloads.failure'},
-                'uptime_percentage': {
-                    '$avg': {
-                        '$cond': [
-                            {'$eq': ['$stats.checks.success', 0]},
-                            0,
-                            {'$divide': ['$stats.checks.success', {'$add': ['$stats.checks.success', '$stats.checks.failure']}]}
+                'total_checks': {
+                    '$sum': {
+                        '$add': [
+                            '$stats.checks.success',
+                            '$stats.checks.failure'
                         ]
                     }
+                },
+                'success_checks': {'$sum': '$stats.checks.success'},
+                'success_downloads': {'$sum': '$stats.downloads.success'},
+                'failed_downloads': {'$sum': '$stats.downloads.failure'},
+            }},
+            {'$project': {
+                'total_tracked': 1,
+                'success_downloads': 1,
+                'failed_downloads': 1,
+                'uptime_percentage': {
+                    '$cond': [
+                        {'$eq': ['$total_checks', 0]},
+                        0,
+                        {'$divide': ['$success_checks', '$total_checks']}
+                    ]
                 }
             }}
         ]
-        
+
         result = await MongoDB.stats.aggregate(pipeline).to_list(1)
         return result[0] if result else {}
+    
 
     async def aggregate_statistics(self):
         """Aggregate statistics for better performance"""
@@ -149,67 +169,6 @@ class URLTrackerBot:
         )
         return '\n'.join(diff)[:MAX_MESSAGE_LENGTH]
 
-
-    # Updated tracking logic
-    async def check_updates(self, user_id: int, url: str):
-        try:
-            tracked_data = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
-            if not tracked_data:
-                return
-
-            # Night mode check 
-            if tracked_data.get('night_mode'):
-                tz = pytz.timezone(TIMEZONE)
-                now = datetime.now(tz)
-                if not (9 <= now.hour < 22):  # From 9 AM To 10 PM
-                    logger.info(f"Due to night mode, {url} was skipped" )
-                    return
-
-            current_content, new_resources = await self.get_webpage_content(url)
-            await self.create_archive(user_id, url, current_content)
-            
-            previous_hash = tracked_data.get('content_hash', '')
-            current_hash = hashlib.md5(current_content.encode()).hexdigest()
-            
-            if current_hash != previous_hash:
-                diff_content = await self.generate_diff(
-                    tracked_data.get('content', ''),
-                    current_content
-                )
-                await self.send_notification(user_id, url, diff_content)
-                
-                await self.track_statistics('content_changes', user_id, url)
-
-            filtered_resources = []
-            for resource in new_resources:
-                if await self.apply_filters(resource, user_id):
-                    filtered_resources.append(resource)
-
-            if filtered_resources:
-                sent_hashes = []
-                for resource in filtered_resources:
-                    if await self.send_media(user_id, resource, tracked_data):
-                        sent_hashes.append(resource['hash'])
-                        await self.track_statistics('downloads', user_id, url, success=True)
-                    else:
-                        await self.track_statistics('downloads', user_id, url, success=False)
-                
-                update_data = {
-                    'content_hash': current_hash,
-                    'last_checked': datetime.now()
-                }
-                
-                if sent_hashes:
-                    update_data['$push'] = {'sent_hashes': {'$each': sent_hashes}}
-                
-                await MongoDB.urls.update_one(
-                    {'_id': tracked_data['_id']},
-                    {'$set': update_data}
-                )
-                
-        except Exception as e:
-            logger.error(f"Update check failed for {url}: {str(e)}")
-            await self.track_statistics('checks', user_id, url, success=False)
 
     # New command handlers
 
@@ -690,44 +649,71 @@ class URLTrackerBot:
             logger.error(f"Message sending failed: {str(e)}")
 
     # Tracking Core Logic
+
     async def check_updates(self, user_id: int, url: str):
+        """Consolidated update checking logic"""
         try:
             tracked_data = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
             if not tracked_data:
                 return
 
+            # Night mode check
+            if tracked_data.get('night_mode'):
+                tz = pytz.timezone(TIMEZONE)
+                now = datetime.now(tz)
+                if not (9 <= now.hour < 22):
+                    logger.info(f"Night mode active, skipping {url}")
+                    await self.track_statistics('checks', user_id, url, success=False)
+                    return
+
             current_content, new_resources = await self.get_webpage_content(url)
             previous_hash = tracked_data.get('content_hash', '')
-            current_hash = hashlib.md5(current_content.encode()).hexdigest()
+            current_hash = hashlib.sha256(current_content.encode()).hexdigest()  # Better hash
 
-            if current_hash != previous_hash or new_resources:
-                text_changes = f"🔄 Website Updated: {url}\n" + \
-                             f"📅 Change detected at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            changes_detected = False
+            text_changes = ""
 
-                await self.safe_send_message(user_id, text_changes)
+            if current_hash != previous_hash:
+                old_content = tracked_data.get('content', '')
+                if old_content:
+                    diff_content = await self.generate_diff(old_content, current_content)
+                    text_changes = f"🔄 Content Updated: {url}\n{diff_content}"
+                else:
+                    text_changes = f"🔍 Initial Content Saved: {url}"
+            
+                changes_detected = True
+                await self.track_statistics('content_changes', user_id, url)
 
-                sent_hashes = []
-                for resource in new_resources:
-                    if resource['hash'] not in tracked_data.get('sent_hashes', []):
-                        if await self.send_media(user_id, resource, tracked_data):
-                            sent_hashes.append(resource['hash'])
+            sent_hashes = []
+            for resource in new_resources:
+                if resource['hash'] not in tracked_data.get('sent_hashes', []):
+                    if await self.send_media(user_id, resource, tracked_data):
+                        sent_hashes.append(resource['hash'])
+                        await self.track_statistics('downloads', user_id, url, success=True)
+                    else:
+                        await self.track_statistics('downloads', user_id, url, success=False)
+
+            if changes_detected or sent_hashes:
+                if text_changes:
+                    await self.safe_send_message(user_id, text_changes)
 
                 update_data = {
                     'content_hash': current_hash,
-                    'last_checked': datetime.now()
+                    'last_checked': datetime.now(),
+                    '$push': {'sent_hashes': {'$each': sent_hashes}}
                 }
-
-                if sent_hashes:
-                    update_data['$push'] = {'sent_hashes': {'$each': sent_hashes}}
-
                 await MongoDB.urls.update_one(
                     {'_id': tracked_data['_id']},
                     {'$set': update_data}
                 )
 
+            await self.track_statistics('checks', user_id, url, success=True)
+
         except Exception as e:
             logger.error(f"Update check failed for {url}: {str(e)}")
-            await self.app.send_message(user_id, f"⚠️ Error checking updates for {url}")
+            await self.track_statistics('checks', user_id, url, success=False)
+            await self.app.send_message(user_id, f"⚠️ Error checking {url}: {str(e)}")
+
 
     # Media Sending
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
