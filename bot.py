@@ -314,6 +314,14 @@ class URLTrackerBot:
             if not tracked_data:
                 return
 
+            # Night mode check 
+            if tracked_data.get('night_mode'):
+                tz = pytz.timezone(TIMEZONE)
+                now = datetime.now(tz)
+                if not (9 <= now.hour < 22):  # From 9 AM To 10 PM
+                    logger.info(f"Due to night mode, {url} was skipped" )
+                    return
+
             current_content, new_resources = await self.get_webpage_content(url)
             await self.create_archive(user_id, url, current_content)
             
@@ -447,7 +455,7 @@ class URLTrackerBot:
         try:
             parts = message.text.split(maxsplit=4)
             if len(parts) < 4:
-                return await message.reply("Format: /track <name> <url> <interval> [night]")
+                return await message.reply("Format: /track name url interval night")
 
             name = parts[1].strip()
             url = parts[2].strip()
@@ -480,11 +488,6 @@ class URLTrackerBot:
 
             # Schedule job
             trigger = IntervalTrigger(minutes=interval)
-            if night_mode:
-                trigger = AndTrigger([
-                    trigger,
-                    CronTrigger(hour='9-22', timezone=TIMEZONE)
-                ])
 
             self.scheduler.add_job(
                 self.check_updates,
