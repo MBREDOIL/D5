@@ -345,8 +345,9 @@ class URLTrackerBot:
         processing_msg = await message.reply("🔍 Scanning URL for documents...")
 
         try:
-            # Validate and sanitize URL
-            if not re.match(r'^https?://(?:www\.)?[\w.-]+\.[a-z]{2,}', url, re.I):
+            # URL validation pattern
+            url_regex = r'^https?://(?:www\.)?[\w.-]+(?:\.[a-z]{2,})?(?::\d+)?(?:/\S*)?$'
+            if not re.match(url_regex, url, re.I):
                 await processing_msg.edit_text("❌ Invalid URL format.")
                 return
 
@@ -378,54 +379,60 @@ class URLTrackerBot:
             # Extract valid document links
             for link in soup.find_all('a', href=True):
                 try:
-                    href = link['href'].strip()
-                    if not href or href.startswith('javascript:'):
+                    raw_href = link['href'].strip()
+                    if not raw_href or raw_href.startswith(('javascript:', 'mailto:')):
                         continue
 
-                    absolute_url = urljoin(url, href)
+                    # Preserve original encoding
+                    absolute_url = urljoin(url, raw_href)
                     parsed = urlparse(absolute_url)
-                    if not parsed.scheme in ('http', 'https'):
-                        continue
 
-                    # Clean URL and get filename
-                    clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-                    filename = os.path.basename(parsed.path)
+                    # Maintain encoded path and query parameters
+                    clean_url = urlunparse((
+                        parsed.scheme,
+                        parsed.netloc,
+                        parsed.path,  # Keep path encoded
+                        '',           # Remove params
+                        parsed.query, # Keep original query
+                        ''            # Remove fragment
+                    ))
+
+                    # Get filename from encoded path
+                    filename = link.text.strip()
                     if not filename:
-                        filename = link.text.strip() or "unnamed_file"
+                        filename = os.path.basename(parsed.path) or "unnamed_file"
+                    filename = unquote(filename)  # Decode filename only
 
-                    # Check for valid extensions
+                    # Check valid extensions
                     ext = os.path.splitext(filename)[1].lower()
                     if ext in FILE_EXTENSIONS:
                         file_links.append((filename, clean_url))
+
                 except Exception as e:
-                    logger.error(f"Error processing link: {str(e)}")
+                    logger.error(f"Link processing error: {str(e)}")
                     continue
 
             if not file_links:
                 await processing_msg.edit_text("❌ No downloadable files found.")
                 return
 
-            # Write to file using async
+            # Write results with encoded URLs
             async with aiofiles.open(txt_filename, 'w', encoding='utf-8') as f:
-                for filename, absolute_url in file_links:
-                    await f.write(f"{filename} || {absolute_url}\n")
+                for filename, url in file_links:
+                    await f.write(f"{filename} || {url}\n")
 
-            # Send the document
+            # Send and cleanup
             await processing_msg.delete()
             await client.send_document(
                 chat_id=message.chat.id,
                 document=txt_filename,
-                caption=f"✅ Found {len(file_links)} files from: {url}"
+                caption=f"📁 Found {len(file_links)} files in: {url}"
             )
-
-            # Cleanup
             await async_os.remove(txt_filename)
-        
 
         except Exception as e:
             logger.error(f"Documents error: {str(e)}")
             await processing_msg.edit_text(f"❌ Error: {str(e)}")
-
 
     # Start & Help Commands
     async def start_handler(self, client: Client, message: Message):
