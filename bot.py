@@ -92,72 +92,6 @@ class URLTrackerBot:
     async def initialize_http_client(self):
         self.http = aiohttp.ClientSession()
 
-    def schedule_maintenance_jobs(self):
-        # Stats aggregation
-        self.scheduler.add_job(
-            self.aggregate_statistics,
-            trigger=IntervalTrigger(hours=STATS_CLEANUP_HOURS),
-            name="stats_aggregation"
-        )
-
-
-    # Statistics system
-
-    async def track_statistics(self, event_type: str, user_id: int, url: str, success: bool = True):
-        """Record statistics for analysis with validation"""
-        # Validate event type to prevent injection
-        valid_events = {'downloads', 'checks', 'content_changes'}
-        if event_type not in valid_events:
-            raise ValueError(f"Invalid event type: {event_type}")
-    
-        # Use bulk writes for better performance if tracking multiple stats
-        await MongoDB.stats.update_one(
-            {'user_id': user_id, 'url': url},
-            {'$inc': {f'stats.{event_type}.{"success" if success else "failure"}': 1}},
-            upsert=True
-        )
-
-    async def get_statistics(self, user_id: int) -> Dict:
-        """Get accurate aggregated statistics for user"""
-        pipeline = [
-            {'$match': {'user_id': user_id}},
-            {'$group': {
-                '_id': None,
-                'total_tracked': {'$sum': 1},
-                'total_checks': {
-                    '$sum': {
-                        '$add': [
-                            '$stats.checks.success',
-                            '$stats.checks.failure'
-                        ]
-                    }
-                },
-                'success_checks': {'$sum': '$stats.checks.success'},
-                'success_downloads': {'$sum': '$stats.downloads.success'},
-                'failed_downloads': {'$sum': '$stats.downloads.failure'},
-            }},
-            {'$project': {
-                'total_tracked': 1,
-                'success_downloads': 1,
-                'failed_downloads': 1,
-                'uptime_percentage': {
-                    '$cond': [
-                        {'$eq': ['$total_checks', 0]},
-                        0,
-                        {'$divide': ['$success_checks', '$total_checks']}
-                    ]
-                }
-            }}
-        ]
-
-        result = await MongoDB.stats.aggregate(pipeline).to_list(1)
-        return result[0] if result else {}
-    
-
-    async def aggregate_statistics(self):
-        """Aggregate statistics for better performance"""
-        # Implement your aggregation logic here
-        logger.info("Statistics aggregation completed")
 
     # Content diff system
     async def generate_diff(self, old_content: str, new_content: str) -> str:
@@ -172,27 +106,11 @@ class URLTrackerBot:
         return '\n'.join(diff)[:MAX_MESSAGE_LENGTH]
 
 
-    # New command handlers
-
-    async def stats_handler(self, client: Client, message: Message):
-        """Show statistics dashboard"""
-        try:
-            stats = await self.get_statistics(message.chat.id)
-            response = (
-                "📊 Statistics Dashboard\n\n"
-                f"Tracked URLs: {stats.get('total_tracked', 0)}\n"
-                f"Success Downloads: {stats.get('success_downloads', 0)}\n"
-                f"Failed Downloads: {stats.get('failed_downloads', 0)}\n"
-                f"Uptime Percentage: {stats.get('uptime_percentage', 0)*100:.2f}%"
-            )
-            await message.reply(response)
-        except Exception as e:
-            await message.reply(f"Failed to get stats: {str(e)}")
+    # Command handlers
 
 
     def initialize_handlers(self):
         handlers = [
-            (self.stats_handler, 'stats'),
             (self.track_handler, 'track'),
             (self.untrack_handler, 'untrack'),
             (self.list_handler, 'list'),
