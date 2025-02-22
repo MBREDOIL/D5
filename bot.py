@@ -392,7 +392,7 @@ class URLTrackerBot:
                     clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
                     # Get filename from encoded path
-                    filename = link.text
+                    filename = link.text.strip()
                     if not filename:
                         filename = os.path.basename(parsed.path) or "unnamed_file"
                     filename = unquote(filename)  # Decode filename only
@@ -412,8 +412,8 @@ class URLTrackerBot:
 
             # Write results with encoded URLs
             async with aiofiles.open(txt_filename, 'w', encoding='utf-8') as f:
-                for filename, url in file_links:
-                    await f.write(f"{filename} || {url}\n")
+                for filename, absolute_url in file_links:
+                    await f.write(f"{filename} || {absolute_url}\n")
 
             # Send and cleanup
             await processing_msg.delete()
