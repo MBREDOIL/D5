@@ -188,8 +188,7 @@ class URLTrackerBot:
                     'name': name,
                     'interval': interval,
                     'night_mode': night_mode,
-                    'content_hash': content_hash
-                    'created_at': datetime.now()
+                    'content_hash': content_hash,
                     'sent_hashes': initial_hashes,
                     'created_at': datetime.now(),
                     'last_checked': datetime.now()
