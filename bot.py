@@ -48,6 +48,18 @@ SUPPORTED_EXTENSIONS = {
     'audio': ['.mp3', '.wav', '.ogg', '.m4a'],
     'video': ['.mp4', '.mkv', '.mov', '.webm']
 }
+FILE_EXTENSIONS = [
+    # Video
+    '.mp4', '.avi', '.mov', '.mkv', '.flv', '.webm',
+    # Audio
+    '.mp3', '.wav', '.ogg', '.m4a',
+    # Documents
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx','.zip','.ppt', '.pptx',
+        # Images
+    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'
+]
+
+
 
 # MongoDB Configuration
 MONGO_URI = os.getenv("MONGO_URI")
@@ -311,18 +323,6 @@ class URLTrackerBot:
         except Exception as e:
             await message.reply(f"❌ Error: {str(e)}")
 
-    
-    # Common file extensions to look for
-    FILE_EXTENSIONS = [
-        # Video
-        '.mp4', '.avi', '.mov', '.mkv', '.flv', '.webm',
-        # Audio
-        '.mp3', '.wav', '.ogg', '.m4a',
-        # Documents
-        '.pdf', '.doc', '.docx', '.xls', '.xlsx','.zip','.ppt', '.pptx',
-        # Images
-        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'
-    ]
 
     # Documents Handler
     async def documents_handler(self, client: Client, message: Message):
@@ -471,7 +471,7 @@ class URLTrackerBot:
                         ext = os.path.splitext(resource_url)[1].lower()
                         for file_type, extensions in SUPPORTED_EXTENSIONS.items():
                             if ext in extensions:
-                                file_hash = hashlib.md5(resource_url.encode()).hexdigest()
+                                file_hash = hashlib.sha256(resource_url.encode()).hexdigest()
                                 resources.append({
                                     'url': resource_url,
                                     'type': file_type,
