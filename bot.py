@@ -16,6 +16,7 @@ from datetime import datetime
 from urllib.parse import urlparse, urljoin, unquote, quote, urlunparse
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Union
+import requests.utils as requests_utils
 
 from pyrogram import Client, filters, enums
 from pyrogram.handlers import MessageHandler
