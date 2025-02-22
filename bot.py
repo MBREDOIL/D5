@@ -377,31 +377,20 @@ class URLTrackerBot:
 
             soup = BeautifulSoup(html, 'lxml')
             file_links = []
-
-            # Extract valid document links
+            
             for link in soup.find_all('a', href=True):
                 try:
-                    href = link['href'].strip()
-                    if not href or href.startswith('javascript:'):
-                        continue
-
-                    # Preserve original encoding
-                    absolute_url = urljoin(url, href)
-                    parsed = urlparse(absolute_url)
-
-                    # Maintain encoded path and query parameters
-                    clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-
-                    # Get filename from encoded path
+                    href = link['href']
+                    encoded_href = requests_utils.requote_uri(href)
+                    absolute_url = urljoin(base_url, encoded_href)
                     filename = link.text.strip()
+                    
                     if not filename:
                         filename = os.path.basename(parsed.path) or "unnamed_file"
-                    filename = unquote(filename)  # Decode filename only
 
                     # Check valid extensions
-                    ext = os.path.splitext(filename)[1].lower()
-                    if ext in FILE_EXTENSIONS:
-                        file_links.append((filename, clean_url))
+                    if any(absolute_url.lower().endswith(ext) for ext in FILE_EXTENSIONS):
+                        file_links.append((filename, absolute_url))
 
                 except Exception as e:
                     logger.error(f"Link processing error: {str(e)}")
