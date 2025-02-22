@@ -388,9 +388,8 @@ class URLTrackerBot:
             return
     
         # Create unique filename
-        domain = get_domain(url)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        txt_filename = f"{domain}_documents_{timestamp}.txt"
+        txt_filename = f"{url}_documents_{timestamp}.txt"
     
         # Write results to file
         with open(txt_filename, 'w', encoding='utf-8') as f:
