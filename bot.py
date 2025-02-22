@@ -385,7 +385,7 @@ class URLTrackerBot:
                     absolute_url = urljoin(url, href)
                     parsed = urlparse(absolute_url)
                     if not parsed.scheme in ('http', 'https'):
-                    continue
+                        continue
 
                     # Clean URL and get filename
                     clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
