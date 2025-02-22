@@ -185,7 +185,7 @@ class URLTrackerBot:
                 self.check_updates,
                 trigger=trigger,
                 args=[message.chat.id, url],
-                id=f"{message.chat.id}_{hashlib.md5(url.encode()).hexdigest()}",
+                id=f"{message.chat.id}_{hashlib.sha256(url.encode()).hexdigest()}",
                 max_instances=2
             )
 
@@ -206,7 +206,8 @@ class URLTrackerBot:
             result = await MongoDB.urls.delete_one({'user_id': user_id, 'url': url})
             if result.deleted_count > 0:
                 url_hash = hashlib.sha256(url.encode()).hexdigest()
-                self.scheduler.remove_job(f"{user_id}_{url_hash}")
+                job_id = f"{user_id}_{url_hash}"
+                self.scheduler.remove_job(job_id)
                 await message.reply(f"❌ Stopped tracking: {url}")
             else:
                 await message.reply("URL not found in your tracked list")
@@ -361,7 +362,7 @@ class URLTrackerBot:
         # Extract all links with href
         for link in soup.find_all('a', href=True):
             href = link['href']
-            encoded_href = requests_utils.requote_uri(href)
+            encoded_href = quote(href)
             absolute_url = urljoin(url, encoded_href)
             filename = link.text.strip()
 
@@ -370,9 +371,9 @@ class URLTrackerBot:
 
             # Check for file extensions
             if any(clean_url.lower().endswith(ext) for ext in FILE_EXTENSIONS):
-                if not link_text:
+                if not filename:
                     filename = os.path.basename(absolute_url)
-                    link_text = os.path.splitext(filename)[0]
+                    filename = os.path.splitext(filename)[0]
                 file_links.append((filename, absolute_url))
     
         if not file_links:
@@ -386,8 +387,8 @@ class URLTrackerBot:
     
         # Write results to file
         with open(txt_filename, 'w', encoding='utf-8') as f:
-            for filename, link in file_links:
-                f.write(f"{filename} || {link}\n")
+            for filename, absolute_url in file_links:
+                f.write(f"{filename} || {absolute_url}\n")
     
         # Send the file
         await processing_msg.delete()
@@ -453,6 +454,14 @@ class URLTrackerBot:
 
                 for tag in soup.find_all(['a', 'img', 'audio', 'video', 'source']):
                     resource_url = None
+                    link_text = ""
+                
+                    # Collect Link text
+                    if tag.name == 'a':
+                        link_text = tag.text.strip()
+                        if not link_text:
+                            link_text = tag.get('title', '')
+                        
                     if tag.name == 'a' and (href := tag.get('href')):
                         resource_url = unquote(urljoin(url, href))
                     elif (src := tag.get('src')):
@@ -466,7 +475,8 @@ class URLTrackerBot:
                                 resources.append({
                                     'url': resource_url,
                                     'type': file_type,
-                                    'hash': file_hash
+                                    'hash': file_hash,
+                                    'text': link_text
                                 })
                                 break
 
@@ -495,7 +505,7 @@ class URLTrackerBot:
             await client.send_document(
                 chat_id=message.chat.id,
                 document=file_path,
-                caption=f"📥 Downloaded from {url}\n💳: {url_text} "
+                caption=f"📥 Downloaded from {url}\n💳 Name: {os.path.basename(resource['url'])} "
             )
             await async_os.remove(file_path)
         except Exception as e:
@@ -644,12 +654,19 @@ class URLTrackerBot:
     
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
         try:
-            caption = (
-                f"📁 {tracked_data.get('name', 'Unnamed')}\n"
-                f"💳 Name: {'url_text'}\n"
-                f"🔗 Source: {tracked_data['url']}\n"
-                f"📥 Direct URL: {resource['url']}"
-            )
+            filename = resource.get('text', '')
+            if not filename:
+                filename = os.path.basename(resource['url'])
+
+        caption = (
+            f"📁 {tracked_data.get('name', 'Unnamed')}\n"
+            f"💳 Name: {'url_text'}\n"
+            f"🔗 Source: {tracked_data['url']}\n"
+            f"📥 Direct URL: {resource['url']}"
+        )
+        cmax_length = 1024
+        if len(caption) > cmax_length:
+            caption = caption[:cmax_length-3] + "..."  # Trim and add ellipsis
 
             file_path = await self.ytdl_download(resource['url'])
             if not file_path:
