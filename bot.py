@@ -380,26 +380,19 @@ class URLTrackerBot:
             # Extract valid document links
             for link in soup.find_all('a', href=True):
                 try:
-                    raw_href = link['href'].strip()
-                    if not raw_href or raw_href.startswith(('javascript:', 'mailto:')):
+                    href = link['href'].strip()
+                    if not href or href.startswith('javascript:'):
                         continue
 
                     # Preserve original encoding
-                    absolute_url = urljoin(url, raw_href)
+                    absolute_url = urljoin(url, href)
                     parsed = urlparse(absolute_url)
 
                     # Maintain encoded path and query parameters
-                    clean_url = urlunparse((
-                        parsed.scheme,
-                        parsed.netloc,
-                        parsed.path,  # Keep path encoded
-                        '',           # Remove params
-                        parsed.query, # Keep original query
-                        ''            # Remove fragment
-                    ))
+                    clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
                     # Get filename from encoded path
-                    filename = link.text.strip()
+                    filename = link.text
                     if not filename:
                         filename = os.path.basename(parsed.path) or "unnamed_file"
                     filename = unquote(filename)  # Decode filename only
