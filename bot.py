@@ -42,8 +42,6 @@ MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
 MAX_MESSAGE_LENGTH = 4096
 TIMEZONE = "Asia/Kolkata"
 MAX_TRACKED_PER_USER = 30
-ARCHIVE_RETENTION_DAYS = 30
-STATS_CLEANUP_HOURS = 48
 SUPPORTED_EXTENSIONS = {
     'pdf': ['.pdf'],
     'image': ['.jpg', '.jpeg', '.png', '.webp'],
@@ -87,7 +85,6 @@ class URLTrackerBot:
         }
         self.initialize_handlers()
         self.create_downloads_dir()
-        self.schedule_maintenance_jobs()
 
     async def initialize_http_client(self):
         self.http = aiohttp.ClientSession()
@@ -313,9 +310,20 @@ class URLTrackerBot:
         except Exception as e:
             await message.reply(f"❌ Error: {str(e)}")
 
+    
+    # Common file extensions to look for
+    FILE_EXTENSIONS = [
+        # Video
+        '.mp4', '.avi', '.mov', '.mkv', '.flv', '.webm',
+        # Audio
+        '.mp3', '.wav', '.ogg', '.m4a',
+        # Documents
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx','.zip','.ppt', '.pptx',
+        # Images
+        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'
+    ]
+
     # Documents Handler
-
-
     async def documents_handler(self, client: Client, message: Message):
         """Handle /documents command"""
         if not await self.is_authorized(message):
@@ -323,62 +331,74 @@ class URLTrackerBot:
 
         user_id = message.chat.id
         url = ' '.join(message.command[1:]).strip()
-
-        tracked = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
-        if not tracked:
-            return await message.reply("URL not found in your tracked list")
-
-        documents = tracked.get('documents', [])
-        if not documents:
-            return await message.reply(f"ℹ️ No documents found for {url}")
-
+    
+        # Validate URL format
+        if not re.match(r'^https?://(?:www\.)?[^\s/$.?#].[^\s]*$', url, re.I):
+            await message.reply("⚠️ Please send a valid URL.")
+            return
+    
+        processing_msg = await message.reply("🔍 Processing your URL...")
+    
         try:
-            txt_file = await self.create_document_file(url, documents)
-            await client.send_document(
-                chat_id=user_id,
-                document=txt_file,
-                caption=f"📑 Documents at {url} ({len(documents)})"
-            )
-            await async_os.remove(txt_file)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+        
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, timeout=10) as response:
+                    if response.status != 200:
+                        await processing_msg.edit_text("❌ Failed to fetch URL content.")
+                        return
+                    html = await response.text()
         except Exception as e:
-            logger.error(f"Error sending documents list: {e}")
-            await message.reply("❌ Error sending documents")
+            await processing_msg.edit_text(f"❌ Error fetching URL: {str(e)}")
+            return
 
+        # Parse HTML content using lxml
+        soup = BeautifulSoup(html, 'lxml')
+        file_links = []
 
-    def extract_documents(html_content, base_url):
-        """Extract document links from HTML"""
-        soup = BeautifulSoup(html_content, 'lxml')
-        document_extensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt']
-        documents = []
-
+        # Extract all links with href
         for link in soup.find_all('a', href=True):
             href = link['href']
             encoded_href = requests_utils.requote_uri(href)
-            absolute_url = urljoin(base_url, encoded_href)
-            link_text = link.text.strip()
+            absolute_url = urljoin(url, encoded_href)
+            filename = link.text.strip()
 
-            if any(absolute_url.lower().endswith(ext) for ext in document_extensions):
+            # Remove query parameters and fragments
+            clean_url = absolute_url.split('?')[0].split('#')[0]
+
+            # Check for file extensions
+            if any(clean_url.lower().endswith(ext) for ext in FILE_EXTENSIONS):
                 if not link_text:
                     filename = os.path.basename(absolute_url)
                     link_text = os.path.splitext(filename)[0]
-                documents.append({
-                    'name': link_text,
-                    'url': absolute_url
-                })
-
-        return list({doc['url']: doc for doc in documents}.values())
-
-    async def create_document_file(url, documents):
-        """Create TXT file with documents list"""
+                file_links.append((filename, absolute_url))
+    
+        if not file_links:
+            await processing_msg.edit_text("❌ No downloadable files found.")
+            return
+    
+        # Create unique filename
         domain = get_domain(url)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{domain}_documents_{timestamp}.txt"
-
-        with open(filename, 'w', encoding='utf-8') as f:
-            for doc in documents:
-                f.write(f"{doc['name']} {doc['url']}\n\n")
-
-        return filename
+        txt_filename = f"{domain}_documents_{timestamp}.txt"
+    
+        # Write results to file
+        with open(txt_filename, 'w', encoding='utf-8') as f:
+            for filename, link in file_links:
+                f.write(f"{filename} || {link}\n")
+    
+        # Send the file
+        await processing_msg.delete()
+        await client.send_document(
+            chat_id=message.chat.id,
+            document=txt_filename,
+            caption=f"✅ Found {len(file_links)} files from the provided URL"
+        )
+    
+        # Clean up
+        os.remove(txt_filename)
 
 
     # Start & Help Commands
@@ -574,7 +594,6 @@ class URLTrackerBot:
                 now = datetime.now(tz)
                 if not (9 <= now.hour < 22):
                     logger.info(f"Night mode active, skipping {url}")
-                    await self.track_statistics('checks', user_id, url, success=False)
                     return
 
             current_content, new_resources = await self.get_webpage_content(url)
@@ -593,16 +612,12 @@ class URLTrackerBot:
                     text_changes = f"🔍 Initial Content Saved: {url}"
             
                 changes_detected = True
-                await self.track_statistics('content_changes', user_id, url)
 
             sent_hashes = []
             for resource in new_resources:
                 if resource['hash'] not in tracked_data.get('sent_hashes', []):
                     if await self.send_media(user_id, resource, tracked_data):
                         sent_hashes.append(resource['hash'])
-                        await self.track_statistics('downloads', user_id, url, success=True)
-                    else:
-                        await self.track_statistics('downloads', user_id, url, success=False)
 
             if changes_detected or sent_hashes:
                 if text_changes:
@@ -618,7 +633,6 @@ class URLTrackerBot:
                     {'$set': update_data}
                 )
 
-            await self.track_statistics('checks', user_id, url, success=True)
 
         except Exception as e:
             logger.error(f"Update check failed for {url}: {str(e)}")
