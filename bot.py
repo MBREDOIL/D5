@@ -366,8 +366,9 @@ class URLTrackerBot:
             txt_filename = os.path.join(docs_dir, f"{safe_domain}_documents_{timestamp}.txt")
 
             # Fetch and parse content
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=10) as response:
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+                async with session.get(url, timeout=15) as response:
+                
                     if response.status != 200:
                         await processing_msg.edit_text("❌ Failed to fetch URL content.")
                         return
