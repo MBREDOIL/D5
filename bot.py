@@ -658,15 +658,12 @@ class URLTrackerBot:
             if not filename:
                 filename = os.path.basename(resource['url'])
 
-        caption = (
-            f"📁 {tracked_data.get('name', 'Unnamed')}\n"
-            f"💳 Name: {'url_text'}\n"
-            f"🔗 Source: {tracked_data['url']}\n"
-            f"📥 Direct URL: {resource['url']}"
-        )
-        cmax_length = 1024
-        if len(caption) > cmax_length:
-            caption = caption[:cmax_length-3] + "..."  # Trim and add ellipsis
+            caption = (
+                f"📁 {tracked_data.get('name', 'Unnamed')}\n"
+                f"💳 Name: {'url_text'}\n"
+                f"🔗 Source: {tracked_data['url']}\n"
+                f"📥 Direct URL: {resource['url']}"
+            )
 
             file_path = await self.ytdl_download(resource['url'])
             if not file_path:
