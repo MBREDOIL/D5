@@ -171,21 +171,28 @@ class URLTrackerBot:
             if tracked_count >= MAX_TRACKED_PER_USER:
                 return await message.reply(f"❌ Tracking limit reached ({MAX_TRACKED_PER_USER} URLs)")
 
-            # Initial check
-            content, _ = await self.get_webpage_content(url)
+        
+            # Initial check with resource tracking
+            content, resources = await self.get_webpage_content(url)
             if not content:
                 return await message.reply("❌ Invalid URL or unable to access")
 
-            # Store in DB
+            # Create initial hashes
+            content_hash = hashlib.sha256(content.encode()).hexdigest()
+            initial_hashes = [r['hash'] for r in resources]
+        
+            # Store in DB with initial state
             await MongoDB.urls.update_one(
                 {'user_id': message.chat.id, 'url': url},
                 {'$set': {
                     'name': name,
                     'interval': interval,
                     'night_mode': night_mode,
-                    'content_hash': hashlib.sha256(content.encode()).hexdigest(),
-                    'sent_hashes': [],
+                    'content_hash': content_hash
                     'created_at': datetime.now()
+                    'sent_hashes': initial_hashes,
+                    'created_at': datetime.now(),
+                    'last_checked': datetime.now()
                 }},
                 upsert=True
             )
@@ -592,7 +599,7 @@ class URLTrackerBot:
     # Tracking Core Logic
 
     async def check_updates(self, user_id: int, url: str):
-        """Consolidated update checking logic"""
+        """Optimized update checking with proper MongoDB operations"""
         try:
             tracked_data = await MongoDB.urls.find_one({'user_id': user_id, 'url': url})
             if not tracked_data:
@@ -605,48 +612,53 @@ class URLTrackerBot:
                 if not (9 <= now.hour < 22):
                     logger.info(f"Night mode active, skipping {url}")
                     return
-
+                    
             current_content, new_resources = await self.get_webpage_content(url)
+            current_hash = hashlib.sha256(current_content.encode()).hexdigest()
             previous_hash = tracked_data.get('content_hash', '')
-            current_hash = hashlib.sha256(current_content.encode()).hexdigest()  # Better hash
-
+            sent_hashes = tracked_data.get('sent_hashes', [])
+        
+            new_hashes = []
             changes_detected = False
-            text_changes = ""
 
+            # Detect content changes
             if current_hash != previous_hash:
-                old_content = tracked_data.get('content', '')
-                if old_content:
-                    diff_content = await self.generate_diff(old_content, current_content)
-                    text_changes = f"🔄 Content Updated: {url}\n{diff_content}"
-                else:
-                    text_changes = f"🔍 Initial Content Saved: {url}"
-            
                 changes_detected = True
+                # Find new resources
+                for resource in new_resources:
+                    if resource['hash'] not in sent_hashes:
+                        if await self.send_media(user_id, resource, tracked_data):
+                            new_hashes.append(resource['hash'])
 
-            sent_hashes = []
-            for resource in new_resources:
-                if resource['hash'] not in tracked_data.get('sent_hashes', []):
-                    if await self.send_media(user_id, resource, tracked_data):
-                        sent_hashes.append(resource['hash'])
-
-            if changes_detected or sent_hashes:
-                if text_changes:
-                    await self.safe_send_message(user_id, text_changes)
-
-                update_data = {
-                    'content_hash': current_hash,
-                    'last_checked': datetime.now(),
-                    '$push': {'sent_hashes': {'$each': sent_hashes}}
+            # Update database only if changes detected
+            if changes_detected or new_hashes:
+                update_operations = {
+                    '$set': {
+                        'last_checked': datetime.now(),
+                        'content_hash': current_hash
+                    }
                 }
+            
+                if new_hashes:
+                    update_operations['$push'] = {'sent_hashes': {'$each': new_hashes}}
+
                 await MongoDB.urls.update_one(
                     {'_id': tracked_data['_id']},
-                    {'$set': update_data}
+                    update_operations
                 )
 
+                # Send change notification
+                diff_content = await self.generate_diff(
+                    tracked_data.get('content', ''), 
+                    current_content
+                )
+                await self.safe_send_message(
+                    user_id, 
+                    f"🔄 Changes detected at {url}:\n{diff_content}"
+                )
 
         except Exception as e:
             logger.error(f"Update check failed for {url}: {str(e)}")
-            await self.track_statistics('checks', user_id, url, success=False)
             await self.app.send_message(user_id, f"⚠️ Error checking {url}: {str(e)}")
 
 
@@ -654,17 +666,16 @@ class URLTrackerBot:
     
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
         try:
-            filename = resource.get('text', '')
-            if not filename:
-                filename = os.path.basename(resource['url'])
+            filename = resource.get('text', '') or os.path.basename(resource['url'])
+            filename = filename[:900]  # Ensure filename length is safe
 
             caption = (
                 f"📁 {tracked_data.get('name', 'Unnamed')}\n"
-                f"💳 Name: {'filename'}\n"
+                f"💳 Name: {filename}\n"
                 f"🔗 Source: {tracked_data['url']}\n"
                 f"📥 Direct URL: {resource['url']}"
             )
-
+        
             file_path = await self.ytdl_download(resource['url'])
             if not file_path:
                 file_path = await self.direct_download(resource['url'])
