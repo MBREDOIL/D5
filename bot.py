@@ -660,7 +660,7 @@ class URLTrackerBot:
 
             caption = (
                 f"📁 {tracked_data.get('name', 'Unnamed')}\n"
-                f"💳 Name: {'url_text'}\n"
+                f"💳 Name: {'filename'}\n"
                 f"🔗 Source: {tracked_data['url']}\n"
                 f"📥 Direct URL: {resource['url']}"
             )
