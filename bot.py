@@ -382,7 +382,7 @@ class URLTrackerBot:
                 try:
                     href = link['href']
                     encoded_href = requests_utils.requote_uri(href)
-                    absolute_url = urljoin(base_url, encoded_href)
+                    absolute_url = urljoin(url, encoded_href)
                     filename = link.text.strip()
                     
                     if not filename:
