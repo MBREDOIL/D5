@@ -331,6 +331,7 @@ class URLTrackerBot:
 
 
     # Documents Handler
+
     async def documents_handler(self, client: Client, message: Message):
         """Handle /documents command"""
         if not await self.is_authorized(message):
@@ -338,73 +339,92 @@ class URLTrackerBot:
 
         user_id = message.chat.id
         url = ' '.join(message.command[1:]).strip()
-    
-        # Validate URL format
-        if not re.match(r'^https?://(?:www\.)?[^\s/$.?#].[^\s]*$', url, re.I):
-            await message.reply("⚠️ Please send a valid URL.")
-            return
-    
-        processing_msg = await message.reply("🔍 Processing your URL...")
-    
+        if not url:
+            return await message.reply("⚠️ Please provide a valid URL.")
+
+        processing_msg = await message.reply("🔍 Scanning URL for documents...")
+
         try:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            }
+            # Validate and sanitize URL
+            if not re.match(r'^https?://(?:www\.)?[\w.-]+\.[a-z]{2,}', url, re.I):
+                await processing_msg.edit_text("❌ Invalid URL format.")
+                return
+
+            # Create documents directory if not exists
+            docs_dir = "documents"
+            if not await async_os.path.exists(docs_dir):
+                await async_os.makedirs(docs_dir)
+
+            # Sanitize domain name for filename
+            parsed_url = urlparse(url)
+            domain = parsed_url.netloc.replace('www.', '').split(':')[0]
+            safe_domain = re.sub(r'[^\w\.-]', '_', domain)
         
+            # Generate safe filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            txt_filename = os.path.join(docs_dir, f"{safe_domain}_documents_{timestamp}.txt")
+
+            # Fetch and parse content
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=10) as response:
+                async with session.get(url, timeout=10) as response:
                     if response.status != 200:
                         await processing_msg.edit_text("❌ Failed to fetch URL content.")
                         return
                     html = await response.text()
+
+            soup = BeautifulSoup(html, 'lxml')
+            file_links = []
+
+            # Extract valid document links
+            for link in soup.find_all('a', href=True):
+                try:
+                    href = link['href'].strip()
+                    if not href or href.startswith('javascript:'):
+                        continue
+
+                    absolute_url = urljoin(url, href)
+                    parsed = urlparse(absolute_url)
+                    if not parsed.scheme in ('http', 'https'):
+                    continue
+
+                    # Clean URL and get filename
+                    clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+                    filename = os.path.basename(parsed.path)
+                    if not filename:
+                        filename = link.text.strip() or "unnamed_file"
+
+                    # Check for valid extensions
+                    ext = os.path.splitext(filename)[1].lower()
+                    if ext in FILE_EXTENSIONS:
+                        file_links.append((filename, clean_url))
+                except Exception as e:
+                    logger.error(f"Error processing link: {str(e)}")
+                    continue
+
+            if not file_links:
+                await processing_msg.edit_text("❌ No downloadable files found.")
+                return
+
+            # Write to file using async
+            async with aiofiles.open(txt_filename, 'w', encoding='utf-8') as f:
+                for filename, absolute_url in file_links:
+                    await f.write(f"{filename} || {absolute_url}\n")
+
+            # Send the document
+            await processing_msg.delete()
+            await client.send_document(
+                chat_id=message.chat.id,
+                document=txt_filename,
+                caption=f"✅ Found {len(file_links)} files from: {url}"
+            )
+
+            # Cleanup
+            await async_os.remove(txt_filename)
+        
+
         except Exception as e:
-            await processing_msg.edit_text(f"❌ Error fetching URL: {str(e)}")
-            return
-
-        # Parse HTML content using lxml
-        soup = BeautifulSoup(html, 'lxml')
-        file_links = []
-
-        # Extract all links with href
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            encoded_href = quote(href)
-            absolute_url = urljoin(url, encoded_href)
-            filename = link.text.strip()
-
-            # Remove query parameters and fragments
-            clean_url = absolute_url.split('?')[0].split('#')[0]
-
-            # Check for file extensions
-            if any(clean_url.lower().endswith(ext) for ext in FILE_EXTENSIONS):
-                if not filename:
-                    filename = os.path.basename(absolute_url)
-                    filename = os.path.splitext(filename)[0]
-                file_links.append((filename, absolute_url))
-    
-        if not file_links:
-            await processing_msg.edit_text("❌ No downloadable files found.")
-            return
-    
-        # Create unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        txt_filename = f"{url}_documents_{timestamp}.txt"
-    
-        # Write results to file
-        with open(txt_filename, 'w', encoding='utf-8') as f:
-            for filename, absolute_url in file_links:
-                f.write(f"{filename} || {absolute_url}\n")
-    
-        # Send the file
-        await processing_msg.delete()
-        await client.send_document(
-            chat_id=message.chat.id,
-            document=txt_filename,
-            caption=f"✅ Found {len(file_links)} files from the provided URL"
-        )
-    
-        # Clean up
-        os.remove(txt_filename)
+            logger.error(f"Documents error: {str(e)}")
+            await processing_msg.edit_text(f"❌ Error: {str(e)}")
 
 
     # Start & Help Commands
@@ -428,16 +448,18 @@ class URLTrackerBot:
             "Example: `/track MySite https://example.com 60 night`\n\n"
             "📌 **Management Commands:**\n"
             "`/untrack <url>` - Stop tracking\n"
-            "`/list` - Show all tracked URLs\n\n"
+            "`/list` - Show all tracked URLs\n"
+            "`/dl <url>` - For downloading\n"
+            "`/documents <url>` For extract txt\n\n"
             "📌 **Admin Commands:**\n"
             "`/addsudo <user_id>` - Add sudo user\n"
-            "`/authchat` - Authorize current chat\n\n"
+            "`/authchat` - Authorize current chat\n"
             "`/removesudo <user_id>` - Remove sudo user\n"
             "`/unauthchat` - Unauthorize current chat\n\n"
             "⚙️ **Features:**\n"
-            "- Night Mode (9AM-10PM only)\n"
+            "- Night Mode Support (9AM-10PM only)\n"
             "- TXT files Generator\n"
-            "- File size limit: 2GB\n"
+            "- Link to file \n"
             "- Max tracked URLs: 30/user"
         )
         await message.reply(help_text)
