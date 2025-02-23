@@ -523,7 +523,7 @@ class URLTrackerBot:
             await client.send_document(
                 chat_id=message.chat.id,
                 document=file_path,
-                caption=f"📥 Downloaded from {url}\n💳 Name: {os.path.basename(resource['url'])} "
+                caption=f"📥 Downloaded from {url}\n💳 Name: {os.path.basename(file_path)}"
             )
             await async_os.remove(file_path)
         except Exception as e:
