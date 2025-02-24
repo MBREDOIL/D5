@@ -444,7 +444,7 @@ class URLTrackerBot:
             "`/untrack url` - Stop tracking\n"
             "`/list` - Show all tracked URLs\n"
             "`/dl url` - For downloading\n"
-            "`/documents - url` For extract txt\n\n"
+            "`/documents url` - For extract txt\n\n"
             "📌 **Admin Commands:**\n"
             "`/addsudo user_id` - Add sudo user\n"
             "`/authchat` - Authorize current chat\n"
