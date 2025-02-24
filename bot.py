@@ -428,7 +428,10 @@ class URLTrackerBot:
             "📌 **Main Commands:**\n"
             "/track - Start tracking a URL\n"
             "/list - Show tracked URLs\n"
-            "/help - Detailed help guide"
+            "/help - Detailed help guide\n\n"
+            "**𖨠 For R.U. Related Queries 𖨠**\n"
+            "⋮𖤪 Join :- ⚝ @uniraj_jaipur ⚝"
+            
         )
 
     async def help_handler(self, client: Client, message: Message):
@@ -441,11 +444,11 @@ class URLTrackerBot:
             "`/untrack <url>` - Stop tracking\n"
             "`/list` - Show all tracked URLs\n"
             "`/dl <url>` - For downloading\n"
-            "`/documents <url>` For extract txt\n\n"
+            "`/documents - <url>` For extract txt\n\n"
             "📌 **Admin Commands:**\n"
-            "`/addsudo <user_id>` - Add sudo user\n"
+            "`/addsudo - <user_id>` - Add sudo user\n"
             "`/authchat` - Authorize current chat\n"
-            "`/removesudo <user_id>` - Remove sudo user\n"
+            "`/removesudo - <user_id>` - Remove sudo user\n"
             "`/unauthchat` - Unauthorize current chat\n\n"
             "⚙️ **Features:**\n"
             "- Night Mode Support (9AM-10PM only)\n"
@@ -523,7 +526,7 @@ class URLTrackerBot:
             await client.send_document(
                 chat_id=message.chat.id,
                 document=file_path,
-                caption=f"📥 Downloaded from {url}\n💳 Name: {os.path.basename(file_path)}"
+                caption=f"📥 Downloaded from {url}\n📋 Title : {os.path.basename(file_path)}"
             )
             await async_os.remove(file_path)
         except Exception as e:
@@ -663,10 +666,7 @@ class URLTrackerBot:
                     tracked_data.get('content', ''), 
                     current_content
                 )
-                await self.safe_send_message(
-                    user_id, 
-                    f"🔄 Changes detected at {url}:\n{diff_content}"
-                )
+                
 
         except Exception as e:
             logger.error(f"Update check failed for {url}: {str(e)}")
@@ -678,13 +678,11 @@ class URLTrackerBot:
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
         try:
             filename = resource.get('text', '') or os.path.basename(resource['url'])
-            filename = filename[:900]  # Ensure filename length is safe
+            filename = filename[:950]  # Ensure filename length is safe
 
             caption = (
-                f"📁 {tracked_data.get('name', 'Unnamed')}\n"
-                f"💳 Name: {filename}\n"
-                f"🔗 Source: {tracked_data['url']}\n"
-                f"📥 Direct URL: {resource['url']}"
+                f"📁 Source: {tracked_data.get('name', 'Unnamed')}\n\n"
+                f"📋 Title : {filename}"
             )
         
             file_path = await self.ytdl_download(resource['url'])
