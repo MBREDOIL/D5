@@ -387,7 +387,7 @@ class URLTrackerBot:
                     filename = link.text.strip()
                     
                     if not filename:
-                        filename = os.path.basename(parsed.path) or "unnamed_file"
+                        filename = os.path.basename(parsed_url.path) or "unnamed_file"
 
                     # Check valid extensions
                     if any(absolute_url.lower().endswith(ext) for ext in FILE_EXTENSIONS):
