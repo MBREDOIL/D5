@@ -682,8 +682,8 @@ class URLTrackerBot:
             filename = filename[:950]  # Ensure filename length is safe
 
             caption = (
-                f"**📁 Source** : {tracked_data.get('name', 'Unnamed')}\n\n"
-                f"**📋 Title** : {filename}"
+                f"***📁 Source ⚝ {tracked_data.get('name', 'Unnamed')} ⚝***\n\n"
+                f"***📋 Title ⋮*** {filename}"
             )
         
             file_path = await self.ytdl_download(resource['url'])
