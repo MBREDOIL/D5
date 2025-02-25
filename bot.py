@@ -682,8 +682,8 @@ class URLTrackerBot:
             filename = filename[:950]  # Ensure filename length is safe
 
             caption = (
-                f"***📁 Source ⚝ {tracked_data.get('name', 'Unnamed')} ⚝***\n\n"
-                f"***📋 Title ⋮*** {filename}"
+                f"**__📁 Source ⚝ {tracked_data.get('name', 'Unnamed')} ⚝__**\n\n"
+                f"**📋 Title ⋮** __{filename}__"
             )
         
             file_path = await self.ytdl_download(resource['url'])
@@ -710,7 +710,7 @@ class URLTrackerBot:
                 user_id,
                 file_path,
                 caption=caption[:1024],
-                parse_mode=enums.ParseMode.HTML
+                parse_mode=enums.ParseMode.MARKDOWN
             )
 
             await async_os.remove(file_path)
