@@ -95,7 +95,7 @@ class URLTrackerBot:
             'noprogress': True,
             'nocheckcertificate': True,
             'max_filesize': MAX_FILE_SIZE,
-            'outtmpl': 'downloads/%(id)s.%(ext)s'
+            'outtmpl': 'downloads/%(title).50s.%(ext)s'
         }
         self.initialize_handlers()
         self.create_downloads_dir()
