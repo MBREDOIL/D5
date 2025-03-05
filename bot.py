@@ -133,6 +133,8 @@ class URLTrackerBot:
             (self.ytdl_handler, 'dl'),
             (self.start_handler, 'start'),
             (self.help_handler, 'help')
+            (self.change_schedule_handler, 'changeschedule')
+            
         ]
         
         for handler, command in handlers:
@@ -236,7 +238,6 @@ class URLTrackerBot:
             )
 
             # Schedule job
-            trigger = IntervalTrigger(minutes=interval)
 
             # In track_handler after DB update:
             await self.schedule_job(message.chat.id, url, interval)
@@ -246,6 +247,49 @@ class URLTrackerBot:
         except Exception as e:
             await message.reply(f"❌ Error: {str(e)}")
 
+
+    # For reschedule 
+    async def change_schedule_handler(self, client: Client, message: Message):
+        if not await self.is_authorized(message):
+            return await message.reply("❌ Authorization failed!")
+
+        try:
+            parts = message.text.split(maxsplit=3)
+            if len(parts) < 3:
+                return await message.reply("Format: /changeschedule <url> <new_interval> [night]")
+
+            url = unquote(parts[1].strip())
+            new_interval = int(parts[2].strip())
+            night_mode = len(parts) > 3 and parts[3].lower().strip() == 'night'
+
+            # Update to database
+            result = await MongoDB.urls.update_one(
+                {'user_id': message.chat.id, 'url': url},
+                {'$set': {
+                    'interval': new_interval,
+                    'night_mode': night_mode
+                }}
+            )
+
+            if result.modified_count == 0:
+                return await message.reply("❌ URL not found or no change")
+
+            # Reschedule the job
+            await self.schedule_job(message.chat.id, url, new_interval)
+        
+            await message.reply(
+                f"✅ Schedule updated:\n"
+                f"🔗 URL: {url}\n"
+                f"⏱ New interval: {new_interval} minutes\n"
+                f"🌙 Night mode: {'ON' if night_mode else 'OFF'}"
+            )
+
+        except ValueError:
+            await message.reply("❌ Put interval in number only (in minutes)")
+        except Exception as e:
+            await message.reply(f"❌ Error: {str(e)}")
+
+    
     # Untrack command
     async def untrack_handler(self, client: Client, message: Message):
         try:
@@ -474,6 +518,7 @@ class URLTrackerBot:
             "`/track <name> <url> <interval> [night]`\n"
             "Example: `/track MySite https://example.com 60 night`\n\n"
             "📌 **Management Commands:**\n"
+            "`/changeschedule <url> <interval> [night]`\n"
             "`/untrack url` - Stop tracking\n"
             "`/list` - Show all tracked URLs\n"
             "`/dl url` - For downloading\n"
