@@ -132,7 +132,7 @@ class URLTrackerBot:
             (self.documents_handler, 'documents'),
             (self.ytdl_handler, 'dl'),
             (self.start_handler, 'start'),
-            (self.help_handler, 'help')
+            (self.help_handler, 'help'),
             (self.change_schedule_handler, 'changeschedule')
             
         ]
