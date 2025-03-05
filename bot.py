@@ -143,6 +143,43 @@ class URLTrackerBot:
         if not os.path.exists('downloads'):
             os.makedirs('downloads')
 
+    ## Add Job Loading on Startup
+    async def load_existing_jobs(self):
+        """Load existing tracked URLs from DB and schedule jobs"""
+        try:
+            tracked_urls = await MongoDB.urls.find().to_list(None)
+            logger.info(f"Loading {len(tracked_urls)} existing tracked URLs")
+
+            for doc in tracked_urls:
+                user_id = doc['user_id']
+                url = doc['url']
+                interval = doc['interval']
+                await self.schedule_job(user_id, url, interval)
+            
+            logger.info("Successfully reloaded tracking jobs")
+        except Exception as e:
+            logger.error(f"Job loading failed: {str(e)}")
+
+
+    ## Refactor Job Scheduling
+    async def schedule_job(self, user_id: int, url: str, interval: int):
+        """Helper to schedule/re-schedule tracking jobs"""
+        job_id = f"{user_id}_{hashlib.sha256(url.encode()).hexdigest()}"
+    
+        # Remove existing job if present
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        # Add new job
+        trigger = IntervalTrigger(minutes=interval)
+        self.scheduler.add_job(
+            self.check_updates,
+            trigger=trigger,
+            args=[user_id, url],
+            id=job_id,
+            max_instances=2
+        )
+    
     # Authorization
     async def is_authorized(self, message: Message) -> bool:
         if message.chat.type in [enums.ChatType.CHANNEL, enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
@@ -201,13 +238,8 @@ class URLTrackerBot:
             # Schedule job
             trigger = IntervalTrigger(minutes=interval)
 
-            self.scheduler.add_job(
-                self.check_updates,
-                trigger=trigger,
-                args=[message.chat.id, url],
-                id=f"{message.chat.id}_{hashlib.sha256(url.encode()).hexdigest()}",
-                max_instances=2
-            )
+            # In track_handler after DB update:
+            await self.schedule_job(message.chat.id, url, interval)
 
             await message.reply(f"✅ Tracking started for:\n📛 Name: {name}\n🔗 URL: {url}")
 
@@ -728,6 +760,9 @@ class URLTrackerBot:
     async def start(self):
         await self.app.start()
         await self.initialize_http_client()  # Initialize the HTTP client
+
+        # Load existing tracked URLs
+        await self.load_existing_jobs()
 
         # Start the web server for health checks
         app = web.Application()
