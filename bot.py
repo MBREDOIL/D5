@@ -778,7 +778,7 @@ class URLTrackerBot:
             if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
                 file_size = os.path.getsize(file_path)
             
-                if file_size <= 3 * 1024 * 1024:  # 3MB
+                if file_size <= 2 * 1024 * 1024:  # 2MB
                     try:
                         doc = fitz.open(file_path)
                         if len(doc) <= 3:  # 3 pages or less
@@ -788,7 +788,7 @@ class URLTrackerBot:
                             for page_num in range(len(doc)):
                                 page = doc.load_page(page_num)
                                 # Render at 200 DPI
-                                mat = fitz.Matrix(150/72, 150/72)
+                                mat = fitz.Matrix(100/72, 100/72)
                                 pix = page.get_pixmap(matrix=mat)
                                 img_path = f"{file_path}_page_{page_num+1}.png"
                             
