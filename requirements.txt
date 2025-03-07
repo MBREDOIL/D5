@@ -11,5 +11,4 @@ python-dotenv>=1.0.0
 beautifulsoup4>=4.12.2
 lxml>=4.9.2
 python-magic>=0.4.27
-Pillow==10.0.0
 PyMuPDF==1.23.8
