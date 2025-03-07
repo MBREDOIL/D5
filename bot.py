@@ -13,6 +13,8 @@ from aiohttp import web
 import mimetypes
 import pytz
 import fitz  # PyMuPDF
+import shutil
+from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse, urljoin, unquote, quote, urlunparse
 from datetime import datetime, timedelta
@@ -755,6 +757,25 @@ class URLTrackerBot:
             await self.app.send_message(user_id, f"⚠️ Error checking {url}: {str(e)}")
 
 
+
+    # Helper function to check PDF criteria
+    async def check_pdf_requirements(file_path: str) -> bool:
+        """Check if PDF is under 3MB and has <=3 pages"""
+        try:
+            # Check file size
+            if os.path.getsize(file_path) > 3 * 1024 * 1024:  # 3MB limit
+                return False
+        
+            # Check page count
+            with fitz.open(file_path) as doc:
+                if len(doc) > 3:  # More than 3 pages
+                    return False
+        
+            return True
+        except Exception as e:
+            logger.error(f"PDF validation failed: {str(e)}")
+            return False
+
     # Media Sending
 
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
@@ -776,52 +797,42 @@ class URLTrackerBot:
 
             # Handle PDF conversion
             if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
-                file_size = os.path.getsize(file_path)
-            
-                if file_size <= 2 * 1024 * 1024:  # 2MB
-                    try:
-                        doc = fitz.open(file_path)
-                        if len(doc) <= 3:  # 3 pages or less
-                            media_group = []
-                            temp_files = []
+                try:
+                    # Check PDF requirements
+                    if await check_pdf_requirements(file_path):
+                        # Convert to images using Ghostscript
+                        with tempfile.TemporaryDirectory() as tmpdir:
+                            images = await convert_pdf_with_ghostscript(
+                                file_path, 
+                                tmpdir,
+                                dpi=150
+                            )
                         
-                            for page_num in range(len(doc)):
-                                page = doc.load_page(page_num)
-                                # Render at 200 DPI
-                                mat = fitz.Matrix(100/72, 100/72)
-                                pix = page.get_pixmap(matrix=mat)
-                                img_path = f"{file_path}_page_{page_num+1}.png"
-                            
-                                # Save temporary image
-                                pix.save(img_path)
-                                temp_files.append(img_path)
-                            
-                                # Add to media group (caption only on first image)
-                                media_group.append(InputMediaPhoto(
-                                    media=img_path,
-                                    caption=caption if page_num == 0 else ""
-                                ))
-
-                            # Send as media group
-                            if media_group:
-                                await self.app.send_media_group(
-                                    chat_id=user_id,
-                                    media=media_group
-                                )
-                            
-                                # Cleanup temporary files
-                                for f in temp_files:
-                                    await async_os.remove(f)
-                                await async_os.remove(file_path)
-                                doc.close()
+                            if images:
+                                media_group = [
+                                    InputMediaPhoto(
+                                        media=img_path,
+                                        caption=caption if idx == 0 else ""
+                                    )
+                                    for idx, img_path in enumerate(images)
+                                ]
+                                await self.app.send_media_group(user_id, media_group)
                                 return True
-                        
-                            doc.close()
+                    else:
+                        # Send original PDF directly
+                        await self.app.send_document(
+                            user_id,
+                            file_path,
+                            caption=caption
+                        )
+                        return True
 
-                    except Exception as e:
-                        logger.error(f"PDF conversion error: {str(e)}")
-                        # Fall through to regular PDF send
-
+                finally:
+                    # Cleanup files
+                    await async_os.remove(file_path)
+                    if 'tmpdir' in locals():
+                        shutil.rmtree(tmpdir, ignore_errors=true)
+            
             # Original sending logic for non-converted files
             file_size = os.path.getsize(file_path)
             if file_size > MAX_FILE_SIZE:
@@ -849,6 +860,43 @@ class URLTrackerBot:
         except Exception as e:
             logger.error(f"Media send failed: {str(e)}")
             return False
+
+
+    # Ghostscript conversion function (from previous answer)
+    async def convert_pdf_with_ghostscript(pdf_path: str, output_dir: str, dpi: int = 100) -> List[str]:
+        """Convert PDF to images using Ghostscript"""
+        try:
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            proc = await asyncio.create_subprocess_exec(
+                "gs",
+                "-dNOPAUSE",
+                "-sDEVICE=png16m",
+                f"-r{dpi}",
+                "-dTextAlphaBits=4",
+                "-dGraphicsAlphaBits=4",
+                f"-sOutputFile={output_dir}/page_%03d.png",
+                pdf_path,
+                "-dBATCH",
+                "-dQUIET",
+                stderr=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE
+            )
+
+            _, stderr = await proc.communicate()
+        
+            if proc.returncode != 0:
+                logger.error(f"Ghostscript error: {stderr.decode()}")
+                return []
+
+            return sorted([str(p) for p in output_dir.glob("*.png")])
+    
+        except Exception as e:
+            logger.error(f"GS conversion failed: {str(e)}")
+            return []
+
+    
 
     # Lifecycle Management
 
