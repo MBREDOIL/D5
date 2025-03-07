@@ -14,6 +14,7 @@ import mimetypes
 import pytz
 import fitz  # PyMuPDF
 import shutil
+import tempfile
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse, urljoin, unquote, quote, urlunparse
