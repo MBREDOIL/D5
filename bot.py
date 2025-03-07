@@ -757,16 +757,7 @@ class URLTrackerBot:
             await self.app.send_message(user_id, f"⚠️ Error checking {url}: {str(e)}")
 
 
-
-    # Helper function to check PDF criteria
-async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
-    # ... existing code ...
-    
-    # ... rest of the code ...
-        
-
-    # Media Sending
-
+    # send media 
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
         try:
             filename = resource.get('text', '') or os.path.basename(resource['url'])
