@@ -776,7 +776,7 @@ class URLTrackerBot:
             if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
                 file_size = os.path.getsize(file_path)
             
-                if file_size <= 5 * 1024 * 1024:  # 5MB
+                if file_size <= 3 * 1024 * 1024:  # 3MB
                     try:
                         doc = fitz.open(file_path)
                         if len(doc) <= 3:  # 3 pages or less
