@@ -7,29 +7,26 @@ RUN apt-get update && apt-get install -y \
     libfreetype6 \
     libjbig2dec0 \
     libopenjp2-7 \
-    libjpeg8 \
+    libjpeg62-turbo \
     libssl1.1 \
     libpng16-16 \
     libx11-6 \
     libmupdf-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory
 WORKDIR /app
 
-# Copy and install Python dependencies
+# Set environment variables before installing requirements
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+ENV PYMUPDF_SETUP_MUPDF_BUILD=0
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application files
 COPY . .
 
 # Create necessary directories
 RUN mkdir -p /app/downloads
 
-# Environment variables
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONPATH=/app
-
-# Command to run your application
 CMD ["python", "-m", "bot"]
