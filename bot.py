@@ -109,6 +109,25 @@ class URLTrackerBot:
     async def initialize_http_client(self):
         self.http = aiohttp.ClientSession()
 
+    
+    async def check_pdf_requirements(self, file_path: str) -> bool:
+        """Check PDF size and page count"""
+        try:
+            # Get file size
+            file_size = await async_os.path.getsize(file_path)
+            if file_size > 3 * 1024 * 1024:  # 3MB limit
+                return False
+            
+            # Check page count with PyMuPDF
+            with fitz.open(file_path) as doc:
+                if len(doc) > 3:
+                    return False
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"PDF check failed: {str(e)}")
+            return False
+
 
     # Content diff system
     async def generate_diff(self, old_content: str, new_content: str) -> str:
@@ -621,8 +640,7 @@ class URLTrackerBot:
     async def ytdl_download(self, url: str) -> Optional[str]:
         try:
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
-                info = await asyncio.to_thread(ydl.extract_info, url, download=False)
-
+                info = await asyncio.to_thread(ydl.extract_info, url, download=False) 
                 if 'entries' in info:
                     info = info['entries'][0]
 
