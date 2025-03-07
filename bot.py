@@ -13,7 +13,6 @@ from aiohttp import web
 import mimetypes
 import pytz
 import fitz  # PyMuPDF
-from PIL import Image
 from datetime import datetime
 from urllib.parse import urlparse, urljoin, unquote, quote, urlunparse
 from datetime import datetime, timedelta
@@ -789,20 +788,12 @@ class URLTrackerBot:
                             for page_num in range(len(doc)):
                                 page = doc.load_page(page_num)
                                 # Render at 200 DPI
-                                mat = fitz.Matrix(200/72, 200/72)
+                                mat = fitz.Matrix(150/72, 150/72)
                                 pix = page.get_pixmap(matrix=mat)
                                 img_path = f"{file_path}_page_{page_num+1}.png"
                             
                                 # Save temporary image
                                 pix.save(img_path)
-                            
-                                # Compress with PIL
-                                with Image.open(img_path) as img:
-                                    img.save(img_path, 
-                                        optimize=True, 
-                                        quality=85,
-                                        dpi=(200, 200))
-                            
                                 temp_files.append(img_path)
                             
                                 # Add to media group (caption only on first image)
