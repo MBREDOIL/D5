@@ -759,22 +759,11 @@ class URLTrackerBot:
 
 
     # Helper function to check PDF criteria
-    async def check_pdf_requirements(file_path: str) -> bool:
-        """Check if PDF is under 3MB and has <=3 pages"""
-        try:
-            # Check file size
-            if os.path.getsize(file_path) > 3 * 1024 * 1024:  # 3MB limit
-                return False
+async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
+    # ... existing code ...
+    
+    # ... rest of the code ...
         
-            # Check page count
-            with fitz.open(file_path) as doc:
-                if len(doc) > 3:  # More than 3 pages
-                    return False
-        
-            return True
-        except Exception as e:
-            logger.error(f"PDF validation failed: {str(e)}")
-            return False
 
     # Media Sending
 
@@ -799,7 +788,7 @@ class URLTrackerBot:
             if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
                 try:
                     # Check PDF requirements
-                    if await check_pdf_requirements(file_path):
+                    if await self.check_pdf_requirements(file_path):  # Add self.
                         # Convert to images using Ghostscript
                         with tempfile.TemporaryDirectory() as tmpdir:
                             images = await convert_pdf_with_ghostscript(
