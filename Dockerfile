@@ -1,7 +1,8 @@
 FROM python:3.10-slim-bullseye
 
-# Install system dependencies with backports for libcrypt
-RUN apt-get update && apt-get install -y \
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     ffmpeg \
     libmagic1 \
     libfreetype6 \
@@ -22,7 +23,6 @@ RUN apt-get update && apt-get install -y \
     make \
     libjpeg-dev \
     zlib1g-dev \
-    && apt-get install -y -t bullseye-backports libcrypt1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
