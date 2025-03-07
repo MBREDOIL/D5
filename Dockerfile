@@ -23,6 +23,7 @@ RUN apt-get update && \
     make \
     libjpeg-dev \
     zlib1g-dev \
+    ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
