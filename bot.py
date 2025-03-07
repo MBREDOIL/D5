@@ -12,6 +12,8 @@ import asyncio
 from aiohttp import web
 import mimetypes
 import pytz
+import fitz  # PyMuPDF
+from PIL import Image
 from datetime import datetime
 from urllib.parse import urlparse, urljoin, unquote, quote, urlunparse
 from datetime import datetime, timedelta
@@ -752,7 +754,7 @@ class URLTrackerBot:
 
 
     # Media Sending
-    
+
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
         try:
             filename = resource.get('text', '') or os.path.basename(resource['url'])
@@ -762,7 +764,7 @@ class URLTrackerBot:
                 f"**__📁 Source ⚝ {tracked_data.get('name', 'Unnamed')} ⚝__**\n\n"
                 f"**📋 Title ⋮** __{filename}__"
             )
-        
+
             file_path = await self.ytdl_download(resource['url'])
             if not file_path:
                 file_path = await self.direct_download(resource['url'])
@@ -770,6 +772,63 @@ class URLTrackerBot:
             if not file_path:
                 return False
 
+            # Handle PDF conversion
+            if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
+                file_size = os.path.getsize(file_path)
+            
+                if file_size <= 5 * 1024 * 1024:  # 5MB
+                    try:
+                        doc = fitz.open(file_path)
+                        if len(doc) <= 3:  # 3 pages or less
+                            media_group = []
+                            temp_files = []
+                        
+                            for page_num in range(len(doc)):
+                                page = doc.load_page(page_num)
+                                # Render at 200 DPI
+                                mat = fitz.Matrix(200/72, 200/72)
+                                pix = page.get_pixmap(matrix=mat)
+                                img_path = f"{file_path}_page_{page_num+1}.png"
+                            
+                                # Save temporary image
+                                pix.save(img_path)
+                            
+                                # Compress with PIL
+                                with Image.open(img_path) as img:
+                                    img.save(img_path, 
+                                        optimize=True, 
+                                        quality=85,
+                                        dpi=(200, 200))
+                            
+                                temp_files.append(img_path)
+                            
+                                # Add to media group (caption only on first image)
+                                media_group.append(InputMediaPhoto(
+                                    media=img_path,
+                                    caption=caption if page_num == 0 else ""
+                                ))
+
+                            # Send as media group
+                            if media_group:
+                                await self.app.send_media_group(
+                                    chat_id=user_id,
+                                    media=media_group
+                                )
+                            
+                                # Cleanup temporary files
+                                for f in temp_files:
+                                    await async_os.remove(f)
+                                await async_os.remove(file_path)
+                                doc.close()
+                                return True
+                        
+                            doc.close()
+
+                    except Exception as e:
+                        logger.error(f"PDF conversion error: {str(e)}")
+                        # Fall through to regular PDF send
+
+            # Original sending logic for non-converted files
             file_size = os.path.getsize(file_path)
             if file_size > MAX_FILE_SIZE:
                 logger.warning(f"File too big: {file_size} bytes")
