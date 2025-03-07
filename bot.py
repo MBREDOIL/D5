@@ -25,7 +25,8 @@ from pyrogram import Client, filters, enums
 from pyrogram.handlers import MessageHandler
 from pyrogram.types import (
     Message,
-    Document
+    Document,
+    InputMediaPhoto
 )
 from motor.motor_asyncio import AsyncIOMotorClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -97,7 +98,9 @@ class URLTrackerBot:
             'noprogress': True,
             'nocheckcertificate': True,
             'max_filesize': MAX_FILE_SIZE,
-            'outtmpl': 'downloads/%(title).50s.%(ext)s'
+            'outtmpl': 'downloads/%(title).50s.%(ext)s',
+            'no_warnings': True,  # Add this to suppress warnings
+            'ignoreerrors': True  # Add this to ignore minor errors
         }
         self.initialize_handlers()
         self.create_downloads_dir()
