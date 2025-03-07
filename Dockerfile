@@ -38,4 +38,4 @@ COPY . .
 
 RUN mkdir -p /app/downloads
 
-CMD ["python", "-m", "bot"]
+CMD ["python", "bot.py"]
