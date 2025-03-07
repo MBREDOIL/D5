@@ -16,12 +16,17 @@ RUN apt-get update && apt-get install -y \
     libnss3 \
     libcrypt1 \
     poppler-utils \
+    gcc \
+    g++ \
+    python3-dev \
+    make \
+    libjpeg-dev \
+    zlib1g-dev \
     && apt-get install -y -t bullseye-backports libcrypt1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Set environment variables before installing requirements
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 ENV PYMUPDF_SETUP_MUPDF_BUILD=0
@@ -31,11 +36,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Create necessary directories
 RUN mkdir -p /app/downloads
-
-# Verify critical dependencies
-RUN ldd /usr/local/lib/python3.10/site-packages/fitz/_fitz*.so && \
-    pdftoppm -v
 
 CMD ["python", "-m", "bot"]
