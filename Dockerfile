@@ -5,7 +5,8 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libmagic1 \
     libmupdf-dev \
-    libxcrypt-compat \
+    libxcrypt-dev \
+    && ln -s /usr/lib/x86_64-linux-gnu/libcrypt.so.1 /usr/lib/x86_64-linux-gnu/libcrypt.so.2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
