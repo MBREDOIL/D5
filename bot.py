@@ -126,7 +126,7 @@ class URLTrackerBot:
             
             return True
         except Exception as e:
-            self.logger.error(f"PDF check failed: {str(e)}")
+            logger.error(f"PDF check failed: {str(e)}")
             return False
 
 
@@ -801,7 +801,7 @@ class URLTrackerBot:
                     if await self.check_pdf_requirements(file_path):  # Add self.
                         # Convert to images using Ghostscript
                         with tempfile.TemporaryDirectory() as tmpdir:
-                            images = await convert_pdf_with_ghostscript(
+                            images = await self.convert_pdf_with_ghostscript(
                                 file_path, 
                                 tmpdir,
                                 dpi=150
@@ -830,7 +830,7 @@ class URLTrackerBot:
                     # Cleanup files
                     await async_os.remove(file_path)
                     if 'tmpdir' in locals():
-                        shutil.rmtree(tmpdir, ignore_errors=true)
+                        shutil.rmtree(tmpdir, ignore_errors=True)
             
             # Original sending logic for non-converted files
             file_size = os.path.getsize(file_path)
@@ -862,7 +862,7 @@ class URLTrackerBot:
 
 
     # Ghostscript conversion function (from previous answer)
-    async def convert_pdf_with_ghostscript(pdf_path: str, output_dir: str, dpi: int = 100) -> List[str]:
+    async def convert_pdf_with_ghostscript(self, pdf_path: str, output_dir: str, dpi: int = 100) -> List[str]:
         """Convert PDF to images using Ghostscript"""
         try:
             output_dir = Path(output_dir)
