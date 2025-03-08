@@ -106,6 +106,7 @@ class URLTrackerBot:
         }
         self.initialize_handlers()
         self.create_downloads_dir()
+        self.pdf_lock = asyncio.Lock()
 
     async def initialize_http_client(self):
         self.http = aiohttp.ClientSession()
@@ -797,35 +798,36 @@ class URLTrackerBot:
             # Handle PDF conversion
             if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
                 try:
-                    # Check PDF requirements
-                    if await self.check_pdf_requirements(file_path):  # Add self.
-                        # Convert to images using Ghostscript
-                        with tempfile.TemporaryDirectory() as tmpdir:
-                            images = await self.convert_pdf_with_ghostscript(
-                                file_path, 
-                                tmpdir,
-                                dpi=150
-                            )
+                    async with self.pdf_lock:
+                        # Check PDF requirements
+                        if await self.check_pdf_requirements(file_path):  # Add self.
+                            # Convert to images using Ghostscript
+                            with tempfile.TemporaryDirectory() as tmpdir:
+                                images = await self.convert_pdf_with_ghostscript(
+                                    file_path, 
+                                    tmpdir,
+                                    dpi=200
+                                )
                         
-                            if images:
-                                await asyncio.sleep(1)
-                                media_group = [
-                                    InputMediaPhoto(
-                                        media=img_path,
-                                        caption=caption if idx == 0 else ""
-                                    )
-                                    for idx, img_path in enumerate(images)
-                                ]
-                                await self.app.send_media_group(user_id, media_group)
-                                return True
-                    else:
-                        # Send original PDF directly
-                        await self.app.send_document(
-                            user_id,
-                            file_path,
-                            caption=caption
-                        )
-                        return True
+                                if images:
+                                    await asyncio.sleep(1)
+                                    media_group = [
+                                        InputMediaPhoto(
+                                            media=img_path,
+                                            caption=caption if idx == 0 else ""
+                                        )
+                                        for idx, img_path in enumerate(images)
+                                    ]
+                                    await self.app.send_media_group(user_id, media_group)
+                                    return True
+                        else:
+                            # Send original PDF directly
+                            await self.app.send_document(
+                                user_id,
+                                file_path,
+                                caption=caption
+                            )
+                            return True
 
                 finally:
                     # Cleanup files
