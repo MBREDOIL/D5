@@ -806,7 +806,7 @@ class URLTrackerBot:
                                 images = await self.convert_pdf_with_ghostscript(
                                     file_path, 
                                     tmpdir,
-                                    dpi=200
+                                    dpi=175
                                 )
                         
                                 if images:
