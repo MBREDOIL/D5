@@ -808,6 +808,7 @@ class URLTrackerBot:
                             )
                         
                             if images:
+                                await asyncio.sleep(1)
                                 media_group = [
                                     InputMediaPhoto(
                                         media=img_path,
