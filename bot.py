@@ -574,6 +574,8 @@ class URLTrackerBot:
             async with self.http.get(url, timeout=30) as resp:
                 content = await resp.text()
                 soup = BeautifulSoup(content, 'lxml')
+                # New code for 'sitedce'
+                is_special_site = 'dce' in url.lower()
 
                 resources = []
                 seen_hashes = set()
@@ -594,6 +596,24 @@ class URLTrackerBot:
                         resource_url = unquote(urljoin(url, src))
 
                     if resource_url:
+                        text = ""  # यहां बदलाव शुरू
+                    
+                    # अगर URL special है और <a> टैग है
+                        if is_special_site and tag.name == 'a':
+                            try:
+                                # पैरेंट टेबल रो में जाएं
+                                row = tag.find_parent('tr')
+                                if row:
+                                    # सभी टीडी कॉलम निकालें
+                                    tds = row.find_all('td')
+                                    if len(tds) > 3:  # 4th कॉलम (index 3)
+                                        text = tds[3].get_text(strip=True)
+                            except:
+                                pass
+                        else:
+                            # नॉर्मल साइट के लिए पुराना लॉजिक
+                            text = link_text.strip()
+                        
                         ext = os.path.splitext(resource_url)[1].lower()
                         for file_type, extensions in SUPPORTED_EXTENSIONS.items():
                             if ext in extensions:
@@ -602,7 +622,7 @@ class URLTrackerBot:
                                     'url': resource_url,
                                     'type': file_type,
                                     'hash': file_hash,
-                                    'text': link_text
+                                    'text': text # new change 
                                 })
                                 break
 
@@ -780,13 +800,14 @@ class URLTrackerBot:
     # send media 
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
         try:
-            filename = resource.get('text', '') or os.path.basename(resource['url'])
-            filename = filename[:950]  # Ensure filename length is safe
-
+            # नया कोड: कैप्शन ऑटो-डिटेक्ट
+            is_special = 'dce' in resource['url'].lower()
+            title_label = "विवरण" if is_special else "Title"
+        
             caption = (
                 f"**__📁 Source ⚝ {tracked_data.get('name', 'Unnamed')} ⚝__**\n\n"
-                f"**📋 Title ⋮** __{filename}__"
-            )
+                f"**📋 {title_label} ⋮** __{resource['text']}__"
+            )[:1024]
 
             file_path = await self.ytdl_download(resource['url'])
             if not file_path:
