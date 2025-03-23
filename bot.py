@@ -37,6 +37,7 @@ from pyrogram.types import (
     Document,
     InputMediaPhoto,
     InlineQuery,
+    CallbackQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
     InlineKeyboardMarkup,
