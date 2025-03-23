@@ -36,6 +36,7 @@ from pyrogram.types import (
     Message,
     Document,
     InputMediaPhoto,
+    InlineQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
     InlineKeyboardMarkup,
@@ -274,9 +275,28 @@ class URLTrackerBot:
             await MongoDB.authorized.find_one({'chat_id': message.chat.id})
         ])
 
+    async def show_help(self, inline_query):
+        """Show help message for secret messages."""
+        help_msg = """📨 **How to send secret messages:**
+    Format: `Message to @username`
+    Example: `Hello! How are you? to 4321567890`"""
+    
+        await inline_query.answer([InlineQueryResultArticle(
+            id=str(uuid.uuid4()),
+            title="Secret Message Help",
+            input_message_content=InputTextMessageContent(help_msg),
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("Try It Now", switch_inline_query_current_chat="Hello to @username")
+            ]])
+        )])
+
     async def inline_query_handler(self, client: Client, inline_query: InlineQuery):
         try:
             query = inline_query.query.strip()
+            # यदि query खाली है, तो help message show करें
+            if not query:
+                return await self.show_help(inline_query)
+        
             pattern = r'^(?P<message>.+?)\s+(?:to|for)\s+(?P<recipient>.+)$'
      
             if not (match := re.match(pattern, query, re.IGNORECASE)):
