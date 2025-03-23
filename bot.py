@@ -469,7 +469,7 @@ class URLTrackerBot:
                             parse_mode=ParseMode.MARKDOWN,
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
-        
+                else:
                     # Handle user info from replied message
                     user = message.reply_to_message.from_user
                     premium_status = "✅ Yes" if user.is_premium else "❌ No"
@@ -543,6 +543,14 @@ class URLTrackerBot:
                             [InlineKeyboardButton("Share", switch_inline_query=username)],
                             [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(entity.id).replace('-100', '')}/100")]
                         ]
+                        
+                        photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
+                        return await message.reply_photo(
+                            photo=photo,
+                            caption=response,
+                            parse_mode=ParseMode.MARKDOWN,
+                            reply_markup=InlineKeyboardMarkup(buttons)
+                        )
             
                     else:
                         # Handle users
