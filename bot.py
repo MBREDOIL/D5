@@ -444,7 +444,7 @@ class URLTrackerBot:
             elif message.reply_to_message:
                 try:
                      # Check if replied message contains forwarded channel post
-                     if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
+                    if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
                         chat = await client.get_chat(message.reply_to_message.sender_chat.id)
                         dc_location = DC_LOCATIONS.get(chat.dc_id, "Unknown")
             
