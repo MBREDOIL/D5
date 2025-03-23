@@ -469,54 +469,55 @@ class URLTrackerBot:
                             parse_mode=ParseMode.MARKDOWN,
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
-                else:
+                
                     # Handle user info from replied message
-                    user = message.reply_to_message.from_user
-                    premium_status = "✅ Yes" if user.is_premium else "❌ No"
-                    dc_location = DC_LOCATIONS.get(user.dc_id, "Unknown")
-        
-                    account_created = self.estimate_account_creation_date(user.id)
-                    account_created_str = account_created.strftime("%B %d, %Y") if account_created else "Unknown"
-                    account_age = self.calculate_account_age(account_created) if account_created else "Unknown"
-
-                    name = f"{user.first_name} {user.last_name or ''}".strip()
-                    username = f"@{user.username}" if user.username else "No Username"
-
-                    if user.is_bot:
-                        response = (
-                            f"🤖 **Bot Name:** {name}\n"
-                            f"🆔 **ID:** `{user.id}`\n"
-                            f"🔖 **Username:** {username}\n"
-                            f"🌐 **DC:** {user.dc_id} ({dc_location})\n"
-                            f"📅 **Created:** {account_created_str}\n"
-                            f"⏳ **Age:** {account_age}"
-                        )
                     else:
-                        response = (
-                            f"👤 **User:** {name}\n"
-                            f"🆔 **ID:** `{user.id}`\n"
-                            f"🔖 **Username:** {username}\n"
-                            f"🌐 **DC:** {user.dc_id} ({dc_location})\n"
-                            f"💎 **Premium:** {premium_status}\n"
-                            f"📅 **Created:** {account_created_str}\n"
-                            f"⏳ **Age:** {account_age}"
-                         )
+                        user = message.reply_to_message.from_user
+                        premium_status = "✅ Yes" if user.is_premium else "❌ No"
+                        dc_location = DC_LOCATIONS.get(user.dc_id, "Unknown")
+        
+                        account_created = self.estimate_account_creation_date(user.id)
+                        account_created_str = account_created.strftime("%B %d, %Y") if account_created else "Unknown"
+                        account_age = self.calculate_account_age(account_created) if account_created else "Unknown"
 
-                    buttons = [
-                        [InlineKeyboardButton("📱 Android", url=f"tg://openmessage?user_id={user.id}"),
-                         InlineKeyboardButton("📱 iOS", url=f"tg://user?id={user.id}")],
-                        [InlineKeyboardButton("🔗 Profile Link", url=f"https://t.me/{user.username}") if user.username else InlineKeyboardButton("🔗 User ID", url=f"tg://user?id={user.id}")]
-                    ]
+                        name = f"{user.first_name} {user.last_name or ''}".strip()
+                        username = f"@{user.username}" if user.username else "No Username"
+
+                        if user.is_bot:
+                            response = (
+                                f"🤖 **Bot Name:** {name}\n"
+                                f"🆔 **ID:** `{user.id}`\n"
+                                f"🔖 **Username:** {username}\n"
+                                f"🌐 **DC:** {user.dc_id} ({dc_location})\n"
+                                f"📅 **Created:** {account_created_str}\n"
+                                f"⏳ **Age:** {account_age}"
+                            )
+                        else:
+                            response = (
+                                f"👤 **User:** {name}\n"
+                                f"🆔 **ID:** `{user.id}`\n"
+                                f"🔖 **Username:** {username}\n"
+                                f"🌐 **DC:** {user.dc_id} ({dc_location})\n"
+                                f"💎 **Premium:** {premium_status}\n"
+                                f"📅 **Created:** {account_created_str}\n"
+                                f"⏳ **Age:** {account_age}"
+                            )
+
+                        buttons = [
+                            [InlineKeyboardButton("📱 Android", url=f"tg://openmessage?user_id={user.id}"),
+                             InlineKeyboardButton("📱 iOS", url=f"tg://user?id={user.id}")],
+                            [InlineKeyboardButton("🔗 Profile Link", url=f"https://t.me/{user.username}") if user.username else InlineKeyboardButton("🔗 User ID", url=f"tg://user?id={user.id}")]
+                        ]
     
-                    photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
-                    await message.reply_photo(
-                        photo=photo,
-                        caption=response,
-                        parse_mode=ParseMode.MARKDOWN,
-                        reply_markup=InlineKeyboardMarkup(buttons)
+                        photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
+                        await message.reply_photo(
+                            photo=photo,
+                            caption=response,
+                            parse_mode=ParseMode.MARKDOWN,
+                            reply_markup=InlineKeyboardMarkup(buttons)
     
-                except Exception as e:
-                    await message.reply(f"🚫 Error: {str(e)}")
+                    except Exception as e:
+                        await message.reply(f"🚫 Error: {str(e)}")
         
 
             elif len(message.command) > 1:
