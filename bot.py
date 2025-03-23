@@ -405,43 +405,7 @@ class URLTrackerBot:
             return await message.reply("❌ Authorization failed!")
 
         try:
-            if message.chat.type in ["group", "supergroup", "channel"]:
-                # Skip the premium check for group, supergroup, or channel
-                return
-            if not message.command or (len(message.command) == 1 and not message.reply_to_message):
-                user = message.from_user
-                premium_status = "✅ Yes" if user.is_premium else "❌ No"
-                dc_location = DC_LOCATIONS.get(user.dc_id, "Unknown")
-                account_created = self.estimate_account_creation_date(user.id)
-                account_created_str = account_created.strftime("%B %d, %Y")
-                account_age = self.calculate_account_age(account_created)
-            
-                response = (
-                    f"🌟 **Full Name:** {user.first_name} {user.last_name or ''}\n"
-                    f"🆔 **User ID:** `{user.id}`\n"
-                    f"🔖 **Username:** @{user.username}\n"
-                    f"💬 **Chat Id:** `{user.id}`\n"
-                    f"🌐 **Data Center:** {user.dc_id} ({dc_location})\n"
-                    f"💎 **Premium User:** {premium_status}\n"
-                    f"📅 **Account Created On:** {account_created_str}\n"
-                    f"⏳ **Account Age:** {account_age}"
-                )
-            
-                buttons = [
-                    [InlineKeyboardButton("📱 Android Link", url=f"tg://openmessage?user_id={user.id}"), 
-                     InlineKeyboardButton("📱 iOS Link", url=f"tg://user?id={user.id}")],
-                    [InlineKeyboardButton("🔗 Permanent Link", user_id=user.id)],
-                ]
-            
-                photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
-                await message.reply_photo(
-                    photo=photo,
-                    caption=response,
-                    parse_mode=ParseMode.MARKDOWN,
-                    reply_markup=InlineKeyboardMarkup(buttons)
-                )
-
-            elif message.reply_to_message:
+            if message.reply_to_message:
                 try:
                      # Check if replied message contains forwarded channel post
                     if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
