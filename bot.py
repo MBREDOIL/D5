@@ -279,15 +279,15 @@ class URLTrackerBot:
     async def show_help(self, inline_query):
         """Show help message for secret messages."""
         help_msg = """📨 **How to send secret messages:**
-    Format: `Message to @username`
-    Example: `Hello! How are you? to 4321567890`"""
+    Format: `Message @username`
+    Example: `Hello! How are you? 4321567890`"""
     
         await inline_query.answer([InlineQueryResultArticle(
             id=str(uuid.uuid4()),
             title="Secret Message Help",
             input_message_content=InputTextMessageContent(help_msg),
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Try It Now", switch_inline_query_current_chat="Hello to @username")
+                InlineKeyboardButton("See Format", switch_inline_query_current_chat="secret message @username")
             ]])
         )])
 
@@ -297,8 +297,8 @@ class URLTrackerBot:
             if not query:
                 return await self.show_help(inline_query)
 
-            # पैटर्न: "message to @username" या "message to 1234567890"
-            pattern = r'^(?P<message>.+?)\s+to\s+(?P<recipient>@?\w+|\d+)$'
+            # पैटर्न: "message @username" या "message 1234567890"
+            pattern = r'^(?P<message>.+?)\s+(?P<recipient>@?\w+|\d+)$'
             match = re.match(pattern, query, re.IGNORECASE)
             if not match:
                 return await self.show_help(inline_query)
