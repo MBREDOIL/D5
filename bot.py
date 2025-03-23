@@ -1,5 +1,6 @@
 import os
 import re
+import uuid
 import json 
 import difflib
 import logging
@@ -30,11 +31,15 @@ from pyrogram.enums import ParseMode, ChatType
 from pyrogram.errors import PeerIdInvalid, UsernameNotOccupied, ChannelInvalid
 
 from pyrogram import Client, filters, enums
-from pyrogram.handlers import MessageHandler
+from pyrogram.handlers import MessageHandler, InlineQueryHandler, CallbackQueryHandler
 from pyrogram.types import (
     Message,
     Document,
-    InputMediaPhoto
+    InputMediaPhoto,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
 )
 from motor.motor_asyncio import AsyncIOMotorClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -42,6 +47,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from bs4 import BeautifulSoup
 from aiofiles import os as async_os
+
+
 
 # Configure logging
 logging.basicConfig(
@@ -105,6 +112,7 @@ class MongoDB:
     sudo = db['sudo_users']
     authorized = db['authorized_chats']
     stats = db['statistics']
+    secret_messages = db['secret_messages']
 
 class URLTrackerBot:
     def __init__(self):
@@ -203,11 +211,17 @@ class URLTrackerBot:
             (self.help_handler, 'help'),
             (self.change_schedule_handler, 'changeschedule'),
             (self.info_handler, 'info')
-        ]
+            ]
         
         for handler, command in handlers:
             if command:
                 self.app.add_handler(MessageHandler(handler, filters.command(command)))
+
+        self.app.add_handler(InlineQueryHandler(self.inline_query_handler))
+        self.app.add_handler(CallbackQueryHandler(
+            self.callback_query_handler,
+            filters=filters.regex(r'^[0-9a-f-]{36}$')  # UUID पैटर्न
+        ))
 
     def create_downloads_dir(self):
         if not os.path.exists('downloads'):
