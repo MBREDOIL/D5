@@ -824,12 +824,42 @@ class URLTrackerBot:
                     async with self.pdf_lock:
                         # Check PDF requirements
                         if await self.check_pdf_requirements(file_path):  # Add self.
+                            # Get total file size and page count
+                            total_size_kb = os.path.getsize(file_path) / 1024  # Convert to KB
+                        
+                            with fitz.open(file_path) as doc:
+                                page_count = len(doc)
+                        
+                            # Calculate average page size
+                            if page_count > 0:
+                                avg_page_size_kb = total_size_kb / page_count
+                            else:
+                                avg_page_size_kb = 0  # Handle 0-page edge case
+
+                            # Determine DPI based on average page size
+                            if avg_page_size_kb < 80:
+                                dpi = 300
+                            elif 80 <= avg_page_size_kb < 150:
+                                dpi = 250
+                            elif 150 <= avg_page_size_kb < 300:
+                                dpi = 200
+                            elif 300 <= avg_page_size_kb < 500:
+                                dpi = 180
+                            elif 500 <= avg_page_size_kb < 700:
+                                dpi = 175
+                            elif 700 <= avg_page_size_kb < 1048:
+                                dpi = 150
+                            elif 1024 <= avg_page_size_kb < 2048:
+                                dpi = 100
+                            else:
+                                dpi = 75
+                            
                             # Convert to images using Ghostscript
                             with tempfile.TemporaryDirectory() as tmpdir:
                                 images = await self.convert_pdf_with_ghostscript(
                                     file_path, 
                                     tmpdir,
-                                    dpi=175
+                                    dpi=dpi
                                 )
                         
                                 if images:
