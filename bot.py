@@ -294,43 +294,79 @@ class URLTrackerBot:
     async def inline_query_handler(self, client: Client, inline_query: InlineQuery):
         try:
             query = inline_query.query.strip()
-            # यदि query खाली है, तो help message show करें
             if not query:
                 return await self.show_help(inline_query)
-        
-            pattern = r'^(?P<message>.+?)\s+(?:to|for)\s+(?P<recipient>.+)$'
-     
-            if not (match := re.match(pattern, query, re.IGNORECASE)):
+
+            # पैटर्न: "message to @username" या "message to 1234567890"
+            pattern = r'^(?P<message>.+?)\s+to\s+(?P<recipient>@?\w+|\d+)$'
+            match = re.match(pattern, query, re.IGNORECASE)
+            if not match:
                 return await self.show_help(inline_query)
+
+            message = match.group('message').strip()
+            recipient_input = match.group('recipient').strip()
+            recipient_id = None
+            original_recipient = recipient_input
+
+            # केस 1: यूजरनेम (@ से शुरू) होने पर
+            if recipient_input.startswith('@'):
+                try:
+                    # सिर्फ यूजरनेम वैलिडेट करें
+                    recipient_user = await client.get_users(recipient_input)
+                    recipient_id = recipient_user.id
+                except (PeerIdInvalid, UsernameNotOccupied):
+                    return await inline_query.answer([
+                        InlineQueryResultArticle(
+                            id="invalid_user",
+                            title="❌ Invalid Username!",
+                            input_message_content=InputTextMessageContent(
+                                f"⚠️ Username '{recipient_input}' not found!\n"
+                                "Check username and try again."
+                            )
+                        )
+                    ], cache_time=1)
+
+            # केस 2: न्यूमेरिक यूजर आईडी होने पर (बिना वैलिडेशन)
+            elif recipient_input.isdigit():
+                recipient_id = int(recipient_input)
         
-            message = match.group('message')
-            recipient = match.group('recipient').strip()
+            # केस 3: अमान्य इनपुट
+            else:
+                return await inline_query.answer([
+                    InlineQueryResultArticle(
+                        id="invalid_input",
+                        title="❌ Invalid Format!",
+                        input_message_content=InputTextMessageContent(
+                            "⚠️ Use format: `message to @username` or `message to 1234567890`"
+                        )
+                    )
+                ], cache_time=1)
+
+            # डेटाबेस में स्टोर करें
             message_id = str(uuid.uuid4())
-        
-            # Store raw recipient string
-            await self.secret_messages.insert_one({
+            await MongoDB.secret_messages.insert_one({
                 '_id': message_id,
                 'content': message,
                 'sender_id': inline_query.from_user.id,
-                'recipient': recipient,  # Can be username/user_id
+                'recipient_id': recipient_id,
+                'original_recipient': original_recipient,
                 'timestamp': datetime.now()
             })
-        
-            # Always create message result
+
+            # रिजल्ट बनाएं
             result = InlineQueryResultArticle(
                 id=message_id,
-                title="🔒 Secret Message Created!",
+                title=f"🔒 Message for {original_recipient}",
                 input_message_content=InputTextMessageContent(
-                    "📩 A secret message is waiting!\n"
-                    f"Recipient: {recipient}"
+                    f"📩 Secret message for: {original_recipient}\n"
+                    "(Accessible only by intended user)"
                 ),
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("👀 Reveal Message", callback_data=message_id)
+                    InlineKeyboardButton("👀 Reveal", callback_data=message_id)
                 ]])
             )
-        
             await inline_query.answer([result], cache_time=1)
-        
+
         except Exception as e:
             logger.error(f"Inline error: {str(e)}")
             await inline_query.answer([])
@@ -339,34 +375,28 @@ class URLTrackerBot:
         try:
             message_id = callback.data
             user = callback.from_user
-            message = await self.secret_messages.find_one({'_id': message_id})
         
+            message = await MongoDB.secret_messages.find_one({'_id': message_id})
             if not message:
-                return await callback.answer("Message not found ❌", show_alert=True)
+                return await callback.answer("❌ Message expired!", show_alert=True)
+
+            # सिर्फ यूजरआईडी से चेक करें
+            is_authorized = (
+                user.id == message['recipient_id'] or 
+                user.id == message['sender_id']
+            )
         
-            # Check access permissions
-            is_sender = str(user.id) == str(message['sender_id'])
-            is_recipient = False
-        
-            try:
-                # Try to resolve recipient
-                recipient_user = await client.get_users(message['recipient'])
-                is_recipient = str(user.id) == str(recipient_user.id)
-            except Exception:
-                # Fallback to raw string match
-                is_recipient = (user.username and user.username.lower() == message['recipient'].lower()) \
-                             or (str(user.id) == message['recipient'])
-        
-            if not (is_sender or is_recipient):
-                return await callback.answer("🚫 This message is not for you!", show_alert=True)
-        
-            # Show message (never delete from DB)
-            await callback.answer(message['content'], show_alert=True)
-        
+            if not is_authorized:
+                return await callback.answer("🔒 This message is not for you!", show_alert=True)
+
+            await callback.answer(
+                f"📨 From: {message['original_recipient']}\n\n{message['content']}",
+                show_alert=True
+            )
+
         except Exception as e:
             logger.error(f"Callback error: {str(e)}")
-            await callback.answer("Error occurred ⚠️", show_alert=True)
-        
+            await callback.answer("⚠️ Error loading message!", show_alert=True)
 
     # info command
 
