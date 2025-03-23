@@ -468,6 +468,7 @@ class URLTrackerBot:
                             caption=response,
                             parse_mode=ParseMode.MARKDOWN,
                             reply_markup=InlineKeyboardMarkup(buttons)
+                        )
         
                     # Handle user info from replied message
                     user = message.reply_to_message.from_user
