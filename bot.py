@@ -260,6 +260,79 @@ class URLTrackerBot:
             await MongoDB.authorized.find_one({'chat_id': message.chat.id})
         ])
 
+    async def inline_query_handler(self, client: Client, inline_query: InlineQuery):
+        try:
+            query = inline_query.query.strip()
+            pattern = r'^(?P<message>.+?)\s+(?:to|for)\s+(?P<recipient>.+)$'
+     
+            if not (match := re.match(pattern, query, re.IGNORECASE)):
+                return await self.show_help(inline_query)
+        
+            message = match.group('message')
+            recipient = match.group('recipient').strip()
+            message_id = str(uuid.uuid4())
+        
+            # Store raw recipient string
+            await self.secret_messages.insert_one({
+                '_id': message_id,
+                'content': message,
+                'sender_id': inline_query.from_user.id,
+                'recipient': recipient,  # Can be username/user_id
+                'timestamp': datetime.now()
+            })
+        
+            # Always create message result
+            result = InlineQueryResultArticle(
+                id=message_id,
+                title="🔒 Secret Message Created!",
+                input_message_content=InputTextMessageContent(
+                    "📩 A secret message is waiting!\n"
+                    f"Recipient: {recipient}"
+                ),
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("👀 Reveal Message", callback_data=message_id)
+                ]])
+            )
+        
+            await inline_query.answer([result], cache_time=1)
+        
+        except Exception as e:
+            logger.error(f"Inline error: {str(e)}")
+            await inline_query.answer([])
+
+    async def callback_query_handler(self, client: Client, callback: CallbackQuery):
+        try:
+            message_id = callback.data
+            user = callback.from_user
+            message = await self.secret_messages.find_one({'_id': message_id})
+        
+            if not message:
+                return await callback.answer("Message not found ❌", show_alert=True)
+        
+            # Check access permissions
+            is_sender = str(user.id) == str(message['sender_id'])
+            is_recipient = False
+        
+            try:
+                # Try to resolve recipient
+                recipient_user = await client.get_users(message['recipient'])
+                is_recipient = str(user.id) == str(recipient_user.id)
+            except Exception:
+                # Fallback to raw string match
+                is_recipient = (user.username and user.username.lower() == message['recipient'].lower()) \
+                             or (str(user.id) == message['recipient'])
+        
+            if not (is_sender or is_recipient):
+                return await callback.answer("🚫 This message is not for you!", show_alert=True)
+        
+            # Show message (never delete from DB)
+            await callback.answer(message['content'], show_alert=True)
+        
+        except Exception as e:
+            logger.error(f"Callback error: {str(e)}")
+            await callback.answer("Error occurred ⚠️", show_alert=True)
+        
+
     # info command
 
     async def info_handler(self, client: Client, message: Message):
