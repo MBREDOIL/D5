@@ -3,12 +3,13 @@ import re
 import json 
 import difflib
 import logging
-import asyncio
+import asyncio 
 import aiohttp
 import aiofiles
 import hashlib
 import yt_dlp
 import asyncio
+from asyncio import Semaphore
 from aiohttp import web
 import mimetypes
 import pytz
@@ -107,7 +108,7 @@ class URLTrackerBot:
         self.initialize_handlers()
         self.create_downloads_dir()
         self.pdf_lock = asyncio.Lock()
-        self.pdf_semaphore = Semaphore(1)  # एक बार में अधिकतम 2 प्रोसेस
+        self.pdf_semaphore = Semaphore(1)  # एक बार में अधिकतम 1 प्रोसेस
 
     async def initialize_http_client(self):
         self.http = aiohttp.ClientSession()
