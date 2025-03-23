@@ -535,102 +535,68 @@ class URLTrackerBot:
                         reply_markup=InlineKeyboardMarkup(buttons)
                     )
 
-                elif message.reply_to_message:
-                    # Try as chat/channel
-                    try:
-                        chat = await client.get_chat(username)
-                        dc_location = DC_LOCATIONS.get(chat.dc_id, "Unknown")
+              elif message.reply_to_message:
+                # Try as chat/channel
+                try:
+                    chat = await client.get_chat(username)
+                    dc_location = DC_LOCATIONS.get(chat.dc_id, "Unknown")
                     
-                        response = (
-                            f"📛 **{chat.title}**\n"
-                            f"🆔 **ID:** `{chat.id}`\n"
-                            f"📌 **Type:** {chat.type.name}\n"
-                            f"👥 **Members:** {chat.members_count}\n"
-                            f"🌐 **Data Center:** {chat.dc_id} ({dc_location})"
-                        )
+                    response = (
+                        f"📛 **{chat.title}**\n"
+                        f"🆔 **ID:** `{chat.id}`\n"
+                        f"📌 **Type:** {chat.type.name}\n"
+                        f"👥 **Members:** {chat.members_count}\n"
+                        f"🌐 **Data Center:** {chat.dc_id} ({dc_location})"
+                    )
                     
-                        buttons = [
-                            [InlineKeyboardButton("⚡️Join Chat", url=f"t.me/{username}")],
-                            [InlineKeyboardButton("Share", switch_inline_query=f"@{username}")],
-                            [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(chat.id).replace('-100', '')}/100")]
-                        ]
+                    buttons = [
+                        [InlineKeyboardButton("⚡️Join Chat", url=f"t.me/{username}")],
+                        [InlineKeyboardButton("Share", switch_inline_query=f"@{username}")],
+                        [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(chat.id).replace('-100', '')}/100")]
+                    ]
                     
-                        photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
-                        await message.reply_photo(
-                            photo=photo,
-                            caption=response,
-                            parse_mode=ParseMode.MARKDOWN,
-                            reply_markup=InlineKeyboardMarkup(buttons)
-                        )
+                    photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
+                    await message.reply_photo(
+                        photo=photo,
+                        caption=response,
+                        parse_mode=ParseMode.MARKDOWN,
+                        reply_markup=InlineKeyboardMarkup(buttons)
+                    )
                     
-                    except Exception as e:
-                        await message.reply(f"❌ Invalid username/ID: {str(e)}")
+                except Exception as e:
+                    await message.reply(f"❌ Invalid username/ID: {str(e)}")
 
-                elif len(message.command) > 1:
-                username = message.command[1].strip('@').replace('https://', '').replace('t.me/', '')
-                    # Try as chat/channel
-                    try:
-                        chat = await client.get_chat(username)
-                        dc_location = DC_LOCATIONS.get(chat.dc_id, "Unknown")
+            elif len(message.command) > 1:
+            username = message.command[1].strip('@').replace('https://', '').replace('t.me/', '')
+                # Try as chat/channel
+                try:
+                    chat = await client.get_chat(username)
+                    dc_location = DC_LOCATIONS.get(chat.dc_id, "Unknown")
                     
-                        response = (
-                            f"📛 **{chat.title}**\n"
-                            f"🆔 **ID:** `{chat.id}`\n"
-                            f"📌 **Type:** {chat.type.name}\n"
-                            f"👥 **Members:** {chat.members_count}\n"
-                            f"🌐 **Data Center:** {chat.dc_id} ({dc_location})"
-                        )
+                    response = (
+                        f"📛 **{chat.title}**\n"
+                        f"🆔 **ID:** `{chat.id}`\n"
+                        f"📌 **Type:** {chat.type.name}\n"
+                        f"👥 **Members:** {chat.members_count}\n"
+                        f"🌐 **Data Center:** {chat.dc_id} ({dc_location})"
+                    )
                     
-                        buttons = [
-                            [InlineKeyboardButton("⚡️Join Chat", url=f"t.me/{username}")],
-                            [InlineKeyboardButton("Share", switch_inline_query=f"@{username}")],
-                            [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(chat.id).replace('-100', '')}/100")]
-                        ]
+                    buttons = [
+                        [InlineKeyboardButton("⚡️Join Chat", url=f"t.me/{username}")],
+                        [InlineKeyboardButton("Share", switch_inline_query=f"@{username}")],
+                        [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(chat.id).replace('-100', '')}/100")]
+                    ]
                     
-                        photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
-                        await message.reply_photo(
-                            photo=photo,
-                            caption=response,
-                            parse_mode=ParseMode.MARKDOWN,
-                            reply_markup=InlineKeyboardMarkup(buttons)
-                        )
+                    photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
+                    await message.reply_photo(
+                        photo=photo,
+                        caption=response,
+                        parse_mode=ParseMode.MARKDOWN,
+                        reply_markup=InlineKeyboardMarkup(buttons)
+                    )
                     
-                    except Exception as e:
-                        await message.reply(f"❌ Invalid username/ID: {str(e)}")
-                        
-                        
-
-                except (PeerIdInvalid, UsernameNotOccupied, AttributeError):
-                    # Try as chat/channel
-                    try:
-                        chat = await client.get_chat(username)
-                        dc_location = DC_LOCATIONS.get(chat.dc_id, "Unknown")
-                    
-                        response = (
-                            f"📛 **{chat.title}**\n"
-                            f"🆔 **ID:** `{chat.id}`\n"
-                            f"📌 **Type:** {chat.type.name}\n"
-                            f"👥 **Members:** {chat.members_count}\n"
-                            f"🌐 **Data Center:** {chat.dc_id} ({dc_location})"
-                        )
-                    
-                        buttons = [
-                            [InlineKeyboardButton("⚡️Join Chat", url=f"t.me/{username}")],
-                            [InlineKeyboardButton("Share", switch_inline_query=f"@{username}")],
-                            [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(chat.id).replace('-100', '')}/100")]
-                        ]
-                    
-                        photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
-                        await message.reply_photo(
-                            photo=photo,
-                            caption=response,
-                            parse_mode=ParseMode.MARKDOWN,
-                            reply_markup=InlineKeyboardMarkup(buttons)
-                        )
-                    
-                    except Exception as e:
-                        await message.reply(f"❌ Invalid username/ID: {str(e)}")
-
+                except Exception as e:
+                    await message.reply(f"❌ Invalid username/ID: {str(e)}")
             
             await MongoDB.stats.update_one(
                 {'name': 'info_usage'},
