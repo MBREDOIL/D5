@@ -331,7 +331,7 @@ class URLTrackerBot:
                 buttons = [
                     [InlineKeyboardButton("📱 Android", url=f"tg://openmessage?user_id={user.id}"), 
                      InlineKeyboardButton("📱 iOS", url=f"tg://user?id={user.id}")],
-                    [InlineKeyboardButton("🔗 Link", user_id=user.id)],
+                    [InlineKeyboardButton("🔗 Permanent Link", user_id=user.id)],
                 ]
             
                 photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
@@ -375,8 +375,10 @@ class URLTrackerBot:
                         )
 
                     buttons = [
-                        [InlineKeyboardButton("Open", url=f"tg://user?id={user.id}")],
                         [InlineKeyboardButton("Share", switch_inline_query=f"@{user.username}")]
+                        [InlineKeyboardButton("📱 Android", url=f"tg://openmessage?user_id={user.id}"), 
+                        InlineKeyboardButton("📱 iOS", url=f"tg://user?id={user.id}")],
+                        [InlineKeyboardButton("🔗 Link", user_id=user.id)]
                     ]
                 
                     photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
@@ -387,7 +389,7 @@ class URLTrackerBot:
                         reply_markup=InlineKeyboardMarkup(buttons)
                     )
 
-                except (PeerIdInvalid, UsernameNotOccupied):
+                except (PeerIdInvalid, UsernameNotOccupied, AttributeError):
                     # Try as chat/channel
                     try:
                         chat = await client.get_chat(username)
@@ -398,12 +400,13 @@ class URLTrackerBot:
                             f"🆔 **ID:** `{chat.id}`\n"
                             f"📌 **Type:** {chat.type.name}\n"
                             f"👥 **Members:** {chat.members_count}\n"
-                            f"🌐 **DC:** {chat.dc_id} ({dc_location})"
+                            f"🌐 **Data Center:** {chat.dc_id} ({dc_location})"
                         )
                     
                         buttons = [
-                            [InlineKeyboardButton("Join Chat", url=f"t.me/{username}")],
-                            [InlineKeyboardButton("Share", switch_inline_query=f"@{username}")]
+                            [InlineKeyboardButton("⚡️Join Chat", url=f"t.me/{username}")],
+                            [InlineKeyboardButton("Share", switch_inline_query=f"@{username}")],
+                            [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(chat.id).replace('-100', '')}/100")]
                         ]
                     
                         photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
@@ -416,7 +419,8 @@ class URLTrackerBot:
                     
                     except Exception as e:
                         await message.reply(f"❌ Invalid username/ID: {str(e)}")
-                    
+
+            
             await MongoDB.stats.update_one(
                 {'name': 'info_usage'},
                 {'$inc': {'count': 1}},
