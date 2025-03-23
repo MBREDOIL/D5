@@ -107,6 +107,7 @@ class URLTrackerBot:
         self.initialize_handlers()
         self.create_downloads_dir()
         self.pdf_lock = asyncio.Lock()
+        self.pdf_semaphore = Semaphore(1)  # एक बार में अधिकतम 2 प्रोसेस
 
     async def initialize_http_client(self):
         self.http = aiohttp.ClientSession()
@@ -888,36 +889,44 @@ class URLTrackerBot:
     # Ghostscript conversion function (from previous answer)
     async def convert_pdf_with_ghostscript(self, pdf_path: str, output_dir: str, dpi: int = 100) -> List[str]:
         """Convert PDF to images using Ghostscript"""
-        try:
-            output_dir = Path(output_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
+        async with self.pdf_semaphore:  # कंकरेंसी कंट्रोल
+            await asyncio.sleep(2)  # प्रत्येक प्रोसेस के बीच विलंब
+            try:
+                output_dir = Path(output_dir)
+                output_dir.mkdir(parents=True, exist_ok=True)
 
-            proc = await asyncio.create_subprocess_exec(
-                "gs",
-                "-dNOPAUSE",
-                "-sDEVICE=png16m",
-                f"-r{dpi}",
-                "-dTextAlphaBits=4",
-                "-dGraphicsAlphaBits=4",
-                f"-sOutputFile={output_dir}/page_%03d.png",
-                pdf_path,
-                "-dBATCH",
-                "-dQUIET",
-                stderr=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE
-            )
+                proc = await asyncio.create_subprocess_exec(
+                    "nice", "-n", "10", "gs",
+                    "-dNOPAUSE",
+                    "-sDEVICE=png16m",
+                    f"-r{dpi}",
+                    "-dNumRenderingThreads=1",  # थ्रेड्स लिमिट
+                    "-dBufferSpace=3000000",  # मेमोरी लिमिट
+                    "-dMaxPatternBitmap=200000",  # पैटर्न मेमोरी सीमित
+                    "-dNOTRANSPARENCY",
+                    "-dTextAlphaBits=4",
+                    "-dGraphicsAlphaBits=4",
+                    f"-sOutputFile={output_dir}/page_%03d.png",
+                    pdf_path,
+                    "-dBATCH",
+                    "-dQUIET",
+                    stderr=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE
+                )
 
-            _, stderr = await proc.communicate()
+                _, stderr = await proc.communicate()
         
-            if proc.returncode != 0:
-                logger.error(f"Ghostscript error: {stderr.decode()}")
-                return []
+                if proc.returncode != 0:
+                    logger.error(f"Ghostscript error: {stderr.decode()}")
+                    return []
 
-            return sorted([str(p) for p in output_dir.glob("*.png")])
+                return sorted([str(p) for p in output_dir.glob("*.png")])
     
-        except Exception as e:
-            logger.error(f"GS conversion failed: {str(e)}")
-            return []
+            except Exception as e:
+                logger.error(f"GS conversion failed: {str(e)}")
+                return []
+            finally:
+                await asyncio.sleep(1)  # प्रत्येक प्रोसेस के बीच 1 सेकंड का अंतराल
 
     
 
