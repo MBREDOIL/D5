@@ -412,6 +412,7 @@ class URLTrackerBot:
                             caption=response,
                             parse_mode=ParseMode.MARKDOWN,
                             reply_markup=InlineKeyboardMarkup(buttons)
+                        )
                     
                     except Exception as e:
                         await message.reply(f"❌ Invalid username/ID: {str(e)}")
