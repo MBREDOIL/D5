@@ -1308,12 +1308,6 @@ class URLTrackerBot:
                     await async_os.remove(file_path)
                     if 'tmpdir' in locals():
                         shutil.rmtree(tmpdir, ignore_errors=True)
-
-                finally:
-                    # Cleanup files
-                    await async_os.remove(file_path)
-                    if 'tmpdir' in locals():
-                        shutil.rmtree(tmpdir, ignore_errors=True)
             
             # Original sending logic for non-converted files
             file_size = os.path.getsize(file_path)
@@ -1348,7 +1342,7 @@ class URLTrackerBot:
     async def convert_pdf_with_ghostscript(self, pdf_path: str, output_dir: str, dpi: int = 100) -> List[str]:
         """Convert PDF to images using Ghostscript"""
         async with self.pdf_semaphore:  # कंकरेंसी कंट्रोल
-            await asyncio.sleep(2)  # प्रत्येक प्रोसेस के बीच विलंब
+            await asyncio.sleep(5)  # प्रत्येक प्रोसेस के बीच विलंब
             try:
                 output_dir = Path(output_dir)
                 output_dir.mkdir(parents=True, exist_ok=True)
@@ -1384,7 +1378,7 @@ class URLTrackerBot:
                 logger.error(f"GS conversion failed: {str(e)}")
                 return []
             finally:
-                await asyncio.sleep(1)  # प्रत्येक प्रोसेस के बीच 1 सेकंड का अंतराल
+                await asyncio.sleep(2)  # प्रत्येक प्रोसेस के बीच 2 सेकंड का अंतराल
 
     
 
