@@ -125,9 +125,9 @@ class URLTrackerBot:
             bot_token=os.getenv("BOT_TOKEN"),
             workers=3,  # Concurrency बढ़ाएँ
             sleep_threshold=90,  # Sleep से पहले का टाइम
-            in_memory=True,  # Session को RAM में स्टोर करें
-            retry_delay=5, 
+            in_memory=True  # Session को RAM में स्टोर करें
         )
+        
         self.scheduler = AsyncIOScheduler(timezone=TIMEZONE)
         self.http = None  # Initialize as None
         self.ydl_opts = {
