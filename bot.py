@@ -550,7 +550,7 @@ class URLTrackerBot:
                         [InlineKeyboardButton("🔗 Permanent Link", user_id=user.id)],
                     ]
                     
-                    photo = await client.download_media(entity.photo.big_file_id) if entity.photo else "https://t.me/UIHASH/3"
+                    photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
                     await message.reply_photo(
                         photo=photo,
                         caption=response,
