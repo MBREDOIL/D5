@@ -584,7 +584,7 @@ class URLTrackerBot:
                         caption=response,
                         parse_mode=ParseMode.MARKDOWN,
                         reply_markup=InlineKeyboardMarkup(buttons)
-                    else:
+                else:
                     await message.reply(
                         response,
                         parse_mode=ParseMode.MARKDOWN,
