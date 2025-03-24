@@ -470,8 +470,7 @@ class URLTrackerBot:
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
                 except Exception as e:
-                    # Handle user info from replied message
-                    
+                    try:
                         user = message.reply_to_message.from_user
                         premium_status = "✅ Yes" if user.is_premium else "❌ No"
                         dc_location = DC_LOCATIONS.get(user.dc_id, "Unknown")
