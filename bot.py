@@ -148,24 +148,29 @@ class URLTrackerBot:
     async def initialize_http_client(self):
         self.http = aiohttp.ClientSession()
 
-    
-    async def check_pdf_requirements(self, file_path: str) -> bool:
-        """Check PDF size and page count"""
+    # Modified PDF Check Function
+    async def check_pdf_requirements(self, file_path: str) -> Tuple[bool, float, int]:
+        """Returns (is_valid, total_size_kb, page_count)"""
         try:
-            # Get file size
+            # Get file size once
             file_size = await async_os.path.getsize(file_path)
-            if file_size > 3 * 1024 * 1024:  # 3MB limit
-                return False
-            
-            # Check page count with PyMuPDF
+            total_size_kb = file_size / 1024
+
+            # Get page count once
             with fitz.open(file_path) as doc:
-                if len(doc) > 3:
-                    return False
-            
-            return True
+                page_count = len(doc)
+
+            # Check validity
+            is_valid = (
+                file_size <= 3 * 1024 * 1024 and  # 3MB limit
+                page_count <= 3
+            )
+
+            return is_valid, total_size_kb, page_count
+
         except Exception as e:
             logger.error(f"PDF check failed: {str(e)}")
-            return False
+            return False, 0, 0
 
 
     # Content diff system
