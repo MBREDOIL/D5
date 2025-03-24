@@ -1221,18 +1221,16 @@ class URLTrackerBot:
             if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
                 try:
                     async with self.pdf_lock:
-                        # Check if PDF file exists
-                        if not await async_os.path.exists(file_path):
-                            raise FileNotFoundError("PDF file missing!")
-                        # Check PDF requirements
-                        if await self.check_pdf_requirements(file_path):  # Add self.
-                            # Get total file size and page count
-                            total_size_kb = os.path.getsize(file_path) / 1024  # Convert to KB
-                        
-                            with fitz.open(file_path) as doc:
-                                page_count = len(doc)
-                        
-                            # Calculate average page size
+                    async with self.pdf_lock:
+                        # Single Step: Get PDF size, pages, and validity
+                        is_valid, total_size_kb, page_count = await self.check_pdf_requirements(file_path)
+
+                        if not is_valid:
+                            # Send original PDF if invalid
+                            await self.app.send_document(user_id, file_path, caption=caption)
+                            return True
+
+                            # Calculate DPI based on pre-fetched metrics
                             if page_count > 0:
                                 avg_page_size_kb = total_size_kb / page_count
                             else:
@@ -1258,11 +1256,7 @@ class URLTrackerBot:
                             
                             # Convert to images using Ghostscript
                             with tempfile.TemporaryDirectory() as tmpdir:
-                                images = await self.convert_pdf_with_ghostscript(
-                                    file_path, 
-                                    tmpdir,
-                                    dpi=dpi
-                                )
+                                images = await self.convert_pdf_with_ghostscript(file_path, tmpdir, dpi=dpi)
                         
                                 if images:
                                     await asyncio.sleep(1)
