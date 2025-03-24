@@ -388,7 +388,7 @@ class URLTrackerBot:
                 f"⚠️ Button Pressed By:\n"
                 f"🆔 ID: {user.id}\n"
                 f"👤 Name: {user.first_name}\n"
-                f"🔗 Username: {user.username if user.username else 'No Username'}"
+                f"🔗 Username: @{user.username if user.username else 'No Username'}"
             )
 
             # Authorization check (पहले वाला कोड)
@@ -433,7 +433,7 @@ class URLTrackerBot:
                 response = ( 
                     f"🌟 Full Name: {user.first_name} {user.last_name or ''}\n"
                     f"🆔 User ID: {user.id}\n"
-                    f"🔖 Username: {user.username if user.username else 'No Username'}\n"
+                    f"🔖 Username: @{user.username if user.username else 'No Username'}\n"
                     f"💬 Chat Id: {user.id}\n"
                     f"🌐 Data Center: {user.dc_id} ({dc_location})\n"
                     f"💎 Premium User: {premium_status}\n"
