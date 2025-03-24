@@ -510,7 +510,7 @@ class URLTrackerBot:
                         ]
     
                         photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
-                        await message.reply_photo(
+                        return await message.reply_photo(
                             photo=photo,
                             caption=response,
                             parse_mode=ParseMode.MARKDOWN,
