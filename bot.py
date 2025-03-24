@@ -405,7 +405,43 @@ class URLTrackerBot:
             return await message.reply("❌ Authorization failed!")
 
         try:
-            if message.reply_to_message:
+            if message.chat.type in ["group", "supergroup", "channel"]:
+                # Skip the premium check for group, supergroup, or channel
+                return
+            if not message.command or (len(message.command) == 1 and not message.reply_to_message):
+                user = message.from_user
+                premium_status = "✅ Yes" if user.is_premium else "❌ No"
+                dc_location = DC_LOCATIONS.get(user.dc_id, "Unknown")
+                account_created = self.estimate_account_creation_date(user.id)
+                account_created_str = account_created.strftime("%B %d, %Y")
+                account_age = self.calculate_account_age(account_created)
+            
+                response = (
+                    f"🌟 Full Name: {user.first_name} {user.last_name or ''}\n"
+                    f"🆔 User ID: {user.id}\n"
+                    f"🔖 Username: @{user.username}\n"
+                    f"💬 Chat Id: {user.id}\n"
+                    f"🌐 Data Center: {user.dc_id} ({dc_location})\n"
+                    f"💎 Premium User: {premium_status}\n"
+                    f"📅 Account Created On: {account_created_str}\n"
+                    f"⏳ Account Age: {account_age}"
+                )
+            
+                buttons = [
+                    [InlineKeyboardButton("📱 Android Link", url=f"tg://openmessage?user_id={user.id}"), 
+                     InlineKeyboardButton("📱 iOS Link", url=f"tg://user?id={user.id}")],
+                    [InlineKeyboardButton("🔗 Permanent Link", user_id=user.id)],
+                ]
+            
+                photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
+                await message.reply_photo(
+                    photo=photo,
+                    caption=response,
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=InlineKeyboardMarkup(buttons)
+                )
+
+            elif message.reply_to_message:
                 try:
                      # Check if replied message contains forwarded channel post
                     if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
@@ -433,9 +469,9 @@ class URLTrackerBot:
                             parse_mode=ParseMode.MARKDOWN,
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
-                
+                except Exception as e:
                     # Handle user info from replied message
-                    else:
+                    
                         user = message.reply_to_message.from_user
                         premium_status = "✅ Yes" if user.is_premium else "❌ No"
                         dc_location = DC_LOCATIONS.get(user.dc_id, "Unknown")
@@ -485,83 +521,75 @@ class URLTrackerBot:
                     await message.reply(f"🚫 Error: {str(e)}")
                         
             elif len(message.command) > 1:
-                username = message.command[1].strip('@').replace('https://', '').replace('t.me/', '')
+                username = message.command[1].strip('@').replace('https://', '').replace('http://', '').replace('t.me/', '').replace('/', '').replace(':', '')
+
                 try:
-                    entity = await client.get_chat(username)
-        
-                    if entity.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-                        # Handle groups/channels
-                        dc_location = DC_LOCATIONS.get(entity.dc_id, "Unknown")
-                        members_count = getattr(entity, 'members_count', 'N/A')
-            
-                        response = (
-                            f"📛 **{entity.title}**\n"
-                            f"🆔 **ID:** `{entity.id}`\n"
-                            f"📌 **Type:** {entity.type.name}\n"
-                            f"👥 **Members:** {members_count}\n"
-                            f"🌐 **Data Center:** {entity.dc_id} ({dc_location})"
-                        )
-            
-                        buttons = [
-                            [InlineKeyboardButton("⚡️ Join Chat", url=f"t.me/{username}")],
-                            [InlineKeyboardButton("Share", switch_inline_query=username)],
-                            [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(entity.id).replace('-100', '')}/100")]
-                        ]
-                        
-                        photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
-                        return await message.reply_photo(
-                            photo=photo,
-                            caption=response,
-                            parse_mode=ParseMode.MARKDOWN,
-                            reply_markup=InlineKeyboardMarkup(buttons)
-                        )
-            
-                    else:
-                        # Handle users
-                        premium_status = "✅ Yes" if entity.is_premium else "❌ No"
-                        dc_location = DC_LOCATIONS.get(entity.dc_id, "Unknown")
-                        account_created = self.estimate_account_creation_date(entity.id)
-                        account_created_str = account_created.strftime("%B %d, %Y") if account_created else "Unknown"
-                        account_age = self.calculate_account_age(account_created) if account_created else "Unknown"
-            
-                        if entity.is_bot:
-                            response = (
-                                f"🤖 **Bot Name:** {entity.first_name}\n"
-                                f"🆔 **ID:** `{entity.id}`\n"
-                                f"🔖 **Username:** @{entity.username}\n"
-                                f"🌐 **DC:** {entity.dc_id} ({dc_location})\n"
-                                f"📅 **Created:** {account_created_str}\n"
-                                f"⏳ **Age:** {account_age}"
-                            )
-                        else:
-                            response = (
-                                f"👤 **User:** {entity.first_name} {entity.last_name or ''}\n"
-                                f"🆔 **ID:** `{entity.id}`\n"
-                                f"🔖 **Username:** @{entity.username}\n"
-                                f"🌐 **DC:** {entity.dc_id} ({dc_location})\n"
-                                f"💎 **Premium:** {premium_status}\n"
-                                f"📅 **Created:** {account_created_str}\n"
-                                f"⏳ **Age:** {account_age}"
-                           )
-            
-                        buttons = [
-                            [InlineKeyboardButton("📱 Android", url=f"tg://openmessage?user_id={entity.id}"),
-                             InlineKeyboardButton("📱 iOS", url=f"tg://user?id={entity.id}")],
-                            [InlineKeyboardButton("🔗 Profile Link", url=f"tg://user?id={entity.id}")]
-                        ]
-        
-                    # Send photo with caption for both cases
+                    # पहले user के रूप में check करें
+                    user = await client.get_users(username)
+                
+                    # User info logic
+                    premium_status = "✅ Yes" if user.is_premium else "❌ No"
+                    dc_location = DC_LOCATIONS.get(user.dc_id, "Unknown")
+                    account_created = self.estimate_account_creation_date(user.id)
+                    account_created_str = account_created.strftime("%B %d, %Y")
+                    account_age = self.calculate_account_age(account_created)
+
+                    response = (
+                        f"👤 **User:** {user.first_name} {user.last_name or ''}\n"
+                        f"🆔 **ID:** `{user.id}`\n"
+                        f"🔖 **Username:** @{user.username}\n"
+                        f"🌐 **DC:** {user.dc_id} ({dc_location})\n"
+                        f"💎 **Premium:** {premium_status}\n"
+                        f"📅 **Created:** {account_created_str}\n"
+                        f"⏳ **Age:** {account_age}"
+                    )
+
+                    buttons = [
+                        [InlineKeyboardButton("📱 Android", url=f"tg://openmessage?user_id={user.id}"), 
+                         InlineKeyboardButton("📱 iOS", url=f"tg://user?id={user.id}")],
+                        [InlineKeyboardButton("🔗 Permanent Link", user_id=user.id)],
+                    ]
+                    
                     photo = await client.download_media(entity.photo.big_file_id) if entity.photo else "https://t.me/UIHASH/3"
+
+                except (PeerIdInvalid, UsernameNotOccupied):
+                    # User नहीं मिला तो chat/channel check करें
+                    try:
+                        chat = await client.get_chat(username)
+                        dc_location = DC_LOCATIONS.get(chat.dc_id, "Unknown")
+                    
+                        response = (
+                            f"📛 **{chat.title}**\n"
+                            f"🆔 **ID:** `{chat.id}`\n"
+                            f"📌 **Type:** {chat.type.name}\n"
+                            f"👥 **Members:** {chat.members_count}\n"
+                            f"🌐 **Data Center:** {chat.dc_id} ({dc_location})"
+                        )
+                    
+                        buttons = [
+                            [InlineKeyboardButton("⚡️Join Chat", url=f"t.me/{username}")],
+                            [InlineKeyboardButton("Share", switch_inline_query=f"@{username}")],
+                            [InlineKeyboardButton("🔗 Permanent Link", url=f"t.me/c/{str(chat.id).replace('-100', '')}/100")]
+                        ]
+                    
+                        photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
+
+                    except Exception as e:
+                        return await message.reply(f"❌ Invalid username/ID: {str(e)}")
+
+                # फोटो भेजें
+                if photo:
                     await message.reply_photo(
                         photo=photo,
                         caption=response,
                         parse_mode=ParseMode.MARKDOWN,
                         reply_markup=InlineKeyboardMarkup(buttons)
-                     )
-    
-                except Exception as e:
-                    await message.reply(f"🚫 Error fetching information: {str(e)}")
-            
+                else:
+                await message.reply(
+                    response,
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=InlineKeyboardMarkup(buttons)
+                
             await MongoDB.stats.update_one(
                 {'name': 'info_usage'},
                 {'$inc': {'count': 1}},
@@ -569,8 +597,9 @@ class URLTrackerBot:
             )
 
         except Exception as e:
-            await message.reply(f"❌ Error: {str(e)}")
-            
+            await message.reply(f"🚫 Error fetching information: {str(e)}")
+                
+
 
     # Track command
     async def track_handler(self, client: Client, message: Message):
