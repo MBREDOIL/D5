@@ -597,9 +597,7 @@ class URLTrackerBot:
                     upsert=True
                 )
 
-            except Exception as e:
-                await message.reply(f"🚫 Error fetching information: {str(e)}")
-                
+            
 
 
     # Track command
