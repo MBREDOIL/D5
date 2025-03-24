@@ -1249,11 +1249,11 @@ class URLTrackerBot:
                             elif 150 <= avg_page_size_kb < 300:
                                 dpi = 200
                             elif 300 <= avg_page_size_kb < 500:
-                                dpi = 180
-                            elif 500 <= avg_page_size_kb < 700:
                                 dpi = 175
-                            elif 700 <= avg_page_size_kb < 1048:
+                            elif 500 <= avg_page_size_kb < 700:
                                 dpi = 150
+                            elif 700 <= avg_page_size_kb < 1048:
+                                dpi = 125
                             elif 1024 <= avg_page_size_kb < 2048:
                                 dpi = 100
                             else:
