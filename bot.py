@@ -584,11 +584,13 @@ class URLTrackerBot:
                         caption=response,
                         parse_mode=ParseMode.MARKDOWN,
                         reply_markup=InlineKeyboardMarkup(buttons)
+                    )
                 else:
                     await message.reply(
                         response,
                         parse_mode=ParseMode.MARKDOWN,
                         reply_markup=InlineKeyboardMarkup(buttons)
+                    )
                 
                 await MongoDB.stats.update_one(
                     {'name': 'info_usage'},
