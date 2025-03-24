@@ -381,14 +381,29 @@ class URLTrackerBot:
                 return await callback.answer("❌ Message expired!", show_alert=True)
 
             # सिर्फ यूजरआईडी से चेक करें
+            # नया फीचर: Owner को ऑटो अलर्ट भेजें
+            owner_id = int(os.getenv("OWNER_ID"))
+            await client.send_message(
+                owner_id,
+                f"⚠️ Button Pressed By:\n"
+                f"🆔 ID: {user.id}\n"
+                f"👤 Name: {user.first_name}\n"
+                f"🔗 Username: @{user.username}" 
+                if user.username else "No Username"
+            )
+
+            # Authorization check (पहले वाला कोड)
             is_authorized = (
                 user.id == message['recipient_id'] or 
                 user.id == message['sender_id']
             )
-        
+    
             if not is_authorized:
-                return await callback.answer("🔒 This message is not for you!", show_alert=True)
-
+                user_name = user.first_name or "User"
+                return await callback.answer(
+                    f"🔒 Hi {user_name}, This message is not for you!",
+                    show_alert=True
+                )
             await callback.answer(
                 f"📨 From: {message['original_recipient']}\n\n{message['content']}",
                 show_alert=True
