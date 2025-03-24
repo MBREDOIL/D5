@@ -588,12 +588,7 @@ class URLTrackerBot:
 
                     except Exception as e:
                         await message.reply(f"🚫 Error: {str(e)}")
-                
-                await MongoDB.stats.update_one(
-                    {'name': 'info_usage'},
-                    {'$inc': {'count': 1}},
-                    upsert=True
-                )
+                        
                 except Exception as e:
                     await message.reply(f"🚫 Error fetching information: {str(e)}")
 
