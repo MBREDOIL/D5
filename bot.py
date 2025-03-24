@@ -510,12 +510,14 @@ class URLTrackerBot:
                         ]
     
                         photo = await client.download_media(user.photo.big_file_id) if user.photo else "https://t.me/UIHASH/3"
-                        return await message.reply_photo(
+                        await message.reply_photo(
                             photo=photo,
                             caption=response,
                             parse_mode=ParseMode.MARKDOWN,
                             reply_markup=InlineKeyboardMarkup(buttons)
                         )
+                    except Exception as e:
+                        await message.reply(f"🚫 Error: {str(e)}")
     
 
                         
@@ -550,8 +552,14 @@ class URLTrackerBot:
                     ]
                     
                     photo = await client.download_media(entity.photo.big_file_id) if entity.photo else "https://t.me/UIHASH/3"
+                    await message.reply_photo(
+                        photo=photo,
+                        caption=response,
+                        parse_mode=ParseMode.MARKDOWN,
+                        reply_markup=InlineKeyboardMarkup(buttons)
+                    )
 
-                except (PeerIdInvalid, UsernameNotOccupied):
+                except (PeerIdInvalid, UsernameNotOccupied, IndexError):
                     # User नहीं मिला तो chat/channel check करें
                     try:
                         chat = await client.get_chat(username)
@@ -572,32 +580,24 @@ class URLTrackerBot:
                         ]
                     
                         photo = await client.download_media(chat.photo.big_file_id) if chat.photo else "https://t.me/UIHASH/3"
+                        await message.reply_photo(
+                            photo=photo,
+                            caption=response,
+                            parse_mode=ParseMode.MARKDOWN,
+                            reply_markup=InlineKeyboardMarkup(buttons)
+                        )
 
                     except Exception as e:
-                        return await message.reply(f"❌ Invalid username/ID: {str(e)}")
-
-                # फोटो भेजें
-                if photo:
-                    await message.reply_photo(
-                        photo=photo,
-                        caption=response,
-                        parse_mode=ParseMode.MARKDOWN,
-                        reply_markup=InlineKeyboardMarkup(buttons)
-                    )
-                else:
-                    await message.reply(
-                        response,
-                        parse_mode=ParseMode.MARKDOWN,
-                        reply_markup=InlineKeyboardMarkup(buttons)
-                    )
+                        await message.reply(f"🚫 Error: {str(e)}")
                 
                 await MongoDB.stats.update_one(
                     {'name': 'info_usage'},
                     {'$inc': {'count': 1}},
                     upsert=True
                 )
+                except Exception as e:
+                    await message.reply(f"🚫 Error fetching information: {str(e)}")
 
-            
 
 
     # Track command
