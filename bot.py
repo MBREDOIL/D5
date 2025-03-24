@@ -1198,7 +1198,7 @@ class URLTrackerBot:
             await self.app.send_message(user_id, f"⚠️ Error checking {url}: {str(e)}")
 
 
-    # send media 
+    # send media
     async def send_media(self, user_id: int, resource: Dict, tracked_data: Dict) -> bool:
         try:
             # नया कोड: कैप्शन ऑटो-डिटेक्ट
@@ -1221,6 +1221,9 @@ class URLTrackerBot:
             if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
                 try:
                     async with self.pdf_lock:
+                        # Check if PDF file exists
+                        if not await async_os.path.exists(file_path):
+                            raise FileNotFoundError("PDF file missing!")
                         # Check PDF requirements
                         if await self.check_pdf_requirements(file_path):  # Add self.
                             # Get total file size and page count
@@ -1280,6 +1283,31 @@ class URLTrackerBot:
                                 caption=caption
                             )
                             return True
+
+                except Exception as e:
+                    logger.error(f"PDF processing error: {str(e)}")
+                    # Fallback: Send original PDF if exists
+                    if await async_os.path.exists(file_path):
+                        await self.app.send_document(
+                            user_id,
+                            file_path,
+                            caption=caption
+                        )
+                        return True
+                    else:
+                        await self.app.send_message(
+                            user_id,
+                            f"❌ File not found: {os.path.basename(file_path)}"
+                        )
+                        return False
+                finally:
+                    # Cleanup files only if conversion succeeded
+                    if 'images' in locals() and images:
+                        for img in images:
+                            await async_os.remove(img)
+                    await async_os.remove(file_path)
+                    if 'tmpdir' in locals():
+                        shutil.rmtree(tmpdir, ignore_errors=True)
 
                 finally:
                     # Cleanup files
