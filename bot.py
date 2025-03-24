@@ -1226,7 +1226,6 @@ class URLTrackerBot:
             if resource['type'] == 'pdf' and file_path.lower().endswith('.pdf'):
                 try:
                     async with self.pdf_lock:
-                    async with self.pdf_lock:
                         # Single Step: Get PDF size, pages, and validity
                         is_valid, total_size_kb, page_count = await self.check_pdf_requirements(file_path)
 
