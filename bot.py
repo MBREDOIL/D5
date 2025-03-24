@@ -388,8 +388,7 @@ class URLTrackerBot:
                 f"⚠️ Button Pressed By:\n"
                 f"🆔 ID: {user.id}\n"
                 f"👤 Name: {user.first_name}\n"
-                f"🔗 Username: @{user.username}" if user.username else "No Username"
-                
+                f"🔗 Username: {user.username if user.username else No Username}"
             )
 
             # Authorization check (पहले वाला कोड)
@@ -431,16 +430,17 @@ class URLTrackerBot:
                 account_created_str = account_created.strftime("%B %d, %Y")
                 account_age = self.calculate_account_age(account_created)
             
-                response = (
+                response = ( 
                     f"🌟 Full Name: {user.first_name} {user.last_name or ''}\n"
                     f"🆔 User ID: {user.id}\n"
-                    f"🔖 Username: f"@{user.username}" if user.username else "No Username\n"
+                    f"🔖 Username: {user.username if user.username else No Username}\n"
                     f"💬 Chat Id: {user.id}\n"
                     f"🌐 Data Center: {user.dc_id} ({dc_location})\n"
                     f"💎 Premium User: {premium_status}\n"
                     f"📅 Account Created On: {account_created_str}\n"
                     f"⏳ Account Age: {account_age}"
                 )
+                
             
                 buttons = [
                     [InlineKeyboardButton("📱 Android Link", url=f"tg://openmessage?user_id={user.id}"), 
