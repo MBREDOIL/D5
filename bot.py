@@ -588,9 +588,6 @@ class URLTrackerBot:
 
                     except Exception as e:
                         await message.reply(f"🚫 Error: {str(e)}")
-                        
-                except Exception as e:
-                    await message.reply(f"🚫 Error fetching information: {str(e)}")
 
 
 
