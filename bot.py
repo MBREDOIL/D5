@@ -1275,14 +1275,14 @@ class URLTrackerBot:
                                 ]
                                 await self.app.send_media_group(user_id, media_group)
                                 return True
-                        else:
-                            # Send original PDF directly
-                            await self.app.send_document(
-                                user_id,
-                                file_path,
-                                caption=caption
-                            )
-                            return True
+                            else:
+                                # Send original PDF directly
+                                await self.app.send_document(
+                                    user_id,
+                                    file_path,
+                                    caption=caption
+                                )
+                                return True
 
                 except Exception as e:
                     logger.error(f"PDF processing error: {str(e)}")
