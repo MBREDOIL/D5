@@ -1233,13 +1233,11 @@ class URLTrackerBot:
                             # Send original PDF if invalid
                             await self.app.send_document(user_id, file_path, caption=caption)
                             return True
-
+                            
                             # Calculate DPI based on pre-fetched metrics
-                            if page_count > 0:
-                                avg_page_size_kb = total_size_kb / page_count
-                            else:
-                                avg_page_size_kb = 0  # Handle 0-page edge case
-
+                            
+                            avg_page_size_kb = total_size_kb / page_count if page_count > 0 else 0
+                            
                             # Determine DPI based on average page size
                             if avg_page_size_kb < 80:
                                 dpi = 300
