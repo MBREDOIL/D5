@@ -1234,47 +1234,47 @@ class URLTrackerBot:
                             await self.app.send_document(user_id, file_path, caption=caption)
                             return True
                             
-                            # Calculate DPI based on pre-fetched metrics
+                        # Calculate DPI based on pre-fetched metrics
                             
-                            avg_page_size_kb = total_size_kb / page_count if page_count > 0 else 0
+                        avg_page_size_kb = total_size_kb / page_count if page_count > 0 else 0
                             
-                            # Determine DPI based on average page size
-                            if avg_page_size_kb < 80:
-                                dpi = 300
-                            elif 80 <= avg_page_size_kb < 150:
-                                dpi = 250
-                            elif 150 <= avg_page_size_kb < 300:
-                                dpi = 200
-                            elif 300 <= avg_page_size_kb < 500:
-                                dpi = 175
-                            elif 500 <= avg_page_size_kb < 700:
-                                dpi = 150
-                            elif 700 <= avg_page_size_kb < 1048:
-                                dpi = 125
-                            elif 1024 <= avg_page_size_kb < 2048:
-                                dpi = 100
-                            else:
-                                dpi = 75
+                        # Determine DPI based on average page size
+                        if avg_page_size_kb < 80:
+                            dpi = 300
+                        elif 80 <= avg_page_size_kb < 150:
+                            dpi = 250
+                        elif 150 <= avg_page_size_kb < 300:
+                            dpi = 200
+                        elif 300 <= avg_page_size_kb < 500:
+                            dpi = 175
+                        elif 500 <= avg_page_size_kb < 700:
+                            dpi = 150
+                        elif 700 <= avg_page_size_kb < 1048:
+                            dpi = 125
+                        elif 1024 <= avg_page_size_kb < 2048:
+                            dpi = 100
+                        else:
+                            dpi = 75
                             
-                            # Convert to images using Ghostscript
-                            with tempfile.TemporaryDirectory() as tmpdir:
-                                images = await self.convert_pdf_with_ghostscript(
-                                    file_path, 
-                                    tmpdir, 
-                                    dpi=dpi
-                                )
+                        # Convert to images using Ghostscript
+                        with tempfile.TemporaryDirectory() as tmpdir:
+                            images = await self.convert_pdf_with_ghostscript(
+                                file_path, 
+                                tmpdir, 
+                                dpi=dpi
+                            )
                         
-                                if images:
-                                    await asyncio.sleep(1)
-                                    media_group = [
-                                        InputMediaPhoto(
-                                            media=img_path,
-                                            caption=caption if idx == 0 else ""
-                                        )
-                                        for idx, img_path in enumerate(images)
-                                    ]
-                                    await self.app.send_media_group(user_id, media_group)
-                                    return True
+                            if images:
+                                await asyncio.sleep(1)
+                                media_group = [
+                                    InputMediaPhoto(
+                                        media=img_path,
+                                        caption=caption if idx == 0 else ""
+                                    )
+                                    for idx, img_path in enumerate(images)
+                                ]
+                                await self.app.send_media_group(user_id, media_group)
+                                return True
                         else:
                             # Send original PDF directly
                             await self.app.send_document(
