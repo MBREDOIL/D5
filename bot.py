@@ -1260,7 +1260,11 @@ class URLTrackerBot:
                             
                             # Convert to images using Ghostscript
                             with tempfile.TemporaryDirectory() as tmpdir:
-                                images = await self.convert_pdf_with_ghostscript(file_path, tmpdir, dpi=dpi)
+                                images = await self.convert_pdf_with_ghostscript(
+                                    file_path, 
+                                    tmpdir, 
+                                    dpi=dpi
+                                )
                         
                                 if images:
                                     await asyncio.sleep(1)
@@ -1340,19 +1344,16 @@ class URLTrackerBot:
     async def convert_pdf_with_ghostscript(self, pdf_path: str, output_dir: str, dpi: int = 100) -> List[str]:
         """Convert PDF to images using Ghostscript"""
         async with self.pdf_semaphore:  # कंकरेंसी कंट्रोल
-            await asyncio.sleep(5)  # प्रत्येक प्रोसेस के बीच विलंब
             try:
                 output_dir = Path(output_dir)
                 output_dir.mkdir(parents=True, exist_ok=True)
 
                 proc = await asyncio.create_subprocess_exec(
-                    "nice", "-n", "10", "gs",
+                    "gs",
                     "-dNOPAUSE",
                     "-sDEVICE=png16m",
                     f"-r{dpi}",
                     "-dNumRenderingThreads=1",  # थ्रेड्स लिमिट
-                    "-dBufferSpace=3000000",  # मेमोरी लिमिट
-                    "-dMaxPatternBitmap=200000",  # पैटर्न मेमोरी सीमित
                     "-dNOTRANSPARENCY",
                     "-dTextAlphaBits=4",
                     "-dGraphicsAlphaBits=4",
