@@ -1342,6 +1342,7 @@ class URLTrackerBot:
     async def convert_pdf_with_ghostscript(self, pdf_path: str, output_dir: str, dpi: int = 100) -> List[str]:
         """Convert PDF to images using Ghostscript"""
         async with self.pdf_semaphore:  # कंकरेंसी कंट्रोल
+            await asyncio.sleep(5)  # प्रत्येक प्रोसेस के बीच विलंब
             try:
                 output_dir = Path(output_dir)
                 output_dir.mkdir(parents=True, exist_ok=True)
