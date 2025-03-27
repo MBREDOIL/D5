@@ -1298,10 +1298,6 @@ class URLTrackerBot:
                         )
                         return False
                 finally:
-                    # Cleanup files only if conversion succeeded
-                    if 'images' in locals() and images:
-                        for img in images:
-                            await async_os.remove(img)
                     await async_os.remove(file_path)
                     if 'tmpdir' in locals():
                         shutil.rmtree(tmpdir, ignore_errors=True)
