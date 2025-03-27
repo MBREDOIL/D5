@@ -1257,12 +1257,9 @@ class URLTrackerBot:
                             dpi = 75
                             
                         # Convert to images using Ghostscript
-                        with tempfile.TemporaryDirectory() as tmpdir:
-                            images = await self.convert_pdf_with_ghostscript(
-                                file_path, 
-                                tmpdir, 
-                                dpi=dpi
-                            )
+                        with tempfile.TemporaryDirectory(dir="/dev/shm") as tmpdir:  # RAM-based temp directory
+                            tmp_path = Path(tmpdir)
+                            images = await self.convert_pdf_with_ghostscript(file_path, tmp_path, dpi=dpi)
                         
                             if images:
                                 await asyncio.sleep(1)
