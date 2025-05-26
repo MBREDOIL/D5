@@ -878,7 +878,7 @@ class URLTrackerBot:
 
             # Fetch and parse content
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-                async with session.get(url, timeout=15) as response:
+                async with session.get(url, timeout=200) as response:
                 
                     if response.status != 200:
                         await processing_msg.edit_text("❌ Failed to fetch URL content.")
@@ -977,7 +977,7 @@ class URLTrackerBot:
     # Enhanced Web Monitoring
     async def get_webpage_content(self, url: str) -> Tuple[str, List[Dict]]:
         try:
-            async with self.http.get(url, timeout=30) as resp:
+            async with self.http.get(url, timeout=300) as resp:
                 content = await resp.text()
                 soup = BeautifulSoup(content, 'lxml')
                 # New code for 'sitedce'
