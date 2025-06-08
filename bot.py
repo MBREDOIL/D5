@@ -1067,6 +1067,8 @@ class URLTrackerBot:
 
     async def ytdl_download(self, url: str) -> Optional[str]:
         try:
+            ydl_opts = {**self.ydl_opts, 'socket_timeout': 150, 'connect_timeout': 90}
+            
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
                 info = await asyncio.to_thread(ydl.extract_info, url, download=False) 
                 if 'entries' in info:
@@ -1108,7 +1110,15 @@ class URLTrackerBot:
         
     async def direct_download(self, url: str) -> Optional[str]:
         try:
-            async with self.http.get(url) as resp:
+            # Configure timeout settings
+            timeout = aiohttp.ClientTimeout(
+                connect=60,  # 30 seconds connection timeout
+                sock_read=120,  # 60 seconds data read timeout
+                total=180     # 120 seconds total timeout
+            )
+        
+            async with self.http.get(url, timeout=timeout) as resp:
+                
                 if resp.status != 200:
                     return None
 
