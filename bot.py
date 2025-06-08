@@ -138,8 +138,12 @@ class URLTrackerBot:
             'max_filesize': MAX_FILE_SIZE,
             'outtmpl': 'downloads/%(title).50s.%(ext)s',
             'no_warnings': True,  # Add this to suppress warnings
-            'ignoreerrors': True  # Add this to ignore minor errors
+            'ignoreerrors': True, # Add this to ignore minor errors
+            'socket_timeout': 150,      # 2.5 minutes for data transfer operations
+            'connect_timeout': 90,      # 1.5 minutes for initial connection
+            'retries': 2,               # Add retries for transient errors
         }
+        
         self.initialize_handlers()
         self.create_downloads_dir()
         self.pdf_lock = asyncio.Lock()
@@ -1067,8 +1071,6 @@ class URLTrackerBot:
 
     async def ytdl_download(self, url: str) -> Optional[str]:
         try:
-            ydl_opts = {**self.ydl_opts, 'socket_timeout': 150, 'connect_timeout': 90}
-            
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
                 info = await asyncio.to_thread(ydl.extract_info, url, download=False) 
                 if 'entries' in info:
