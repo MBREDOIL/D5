@@ -1173,9 +1173,9 @@ class URLTrackerBot:
             logger.error(f"YT-DLP Download Error: {str(e)}")
             return await self.direct_download(url)
 
-    except Exception as e:
-        logger.error(f"YT-DLP General Error: {str(e)}")
-        return None
+        except Exception as e:
+            logger.error(f"YT-DLP General Error: {str(e)}")
+            return None
         
 
 
