@@ -25,6 +25,10 @@ from typing import List, Dict, Optional, Tuple, Union
 import requests.utils as requests_utils
 import requests
 
+import os
+from typing import Optional
+import httpx
+
 from dateutil.relativedelta import relativedelta
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.enums import ParseMode, ChatType
@@ -1070,6 +1074,112 @@ class URLTrackerBot:
 
 
     async def ytdl_download(self, url: str) -> Optional[str]:
+        # 1️⃣ Try HTTPX download with retry + resume
+        try:
+            max_retries = 2
+            parsed_url = urlparse(url)
+            file_extension = os.path.splitext(parsed_url.path)[1]
+            filename = os.path.basename(parsed_url.path) or "download"
+
+            if not file_extension:
+                # Get extension from Content-Type header
+                async with httpx.AsyncClient(timeout=120, verify=False, trust_env=False) as client:
+                    head = await client.head(url, follow_redirects=True)
+                    content_type = head.headers.get("content-type")
+                    if content_type:
+                        file_extension = mimetypes.guess_extension(content_type) or ".bin"
+                filename += file_extension
+            elif not filename.endswith(file_extension):
+                filename += file_extension
+
+            file_path = os.path.abspath(filename)
+
+            for attempt in range(1, max_retries + 1):
+                try:
+                    resume_offset = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+                    headers = {"Range": f"bytes={resume_offset}-"} if resume_offset else {}
+
+                    async with httpx.AsyncClient(
+                        timeout=120,
+                        verify=False,
+                        trust_env=False,
+                        headers={"User-Agent": "HTTPX-Downloader/1.0", **headers}
+                    ) as client:
+                        r = await client.get(url, follow_redirects=True)
+                        r.raise_for_status()
+
+                        # If server returns filename via content-disposition
+                        if attempt == 1 and resume_offset == 0:
+                            cd = r.headers.get("content-disposition")
+                            if cd and "filename=" in cd:
+                                filename = cd.split("filename=")[-1].strip('"')
+                                file_path = os.path.abspath(filename)
+
+                        with open(file_path, "ab") as f:
+                            async for chunk in r.aiter_bytes():
+                                f.write(chunk)
+
+                    return file_path  # ✅ Same return as original logic
+                except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as e:
+                    logger.warning(f"[HTTPX Retry {attempt}] Connection issue: {e!r}")
+                    await asyncio.sleep(1)
+                    continue
+                except Exception as e:
+                    logger.error(f"[HTTPX Attempt {attempt}] Failed: {e!r}")
+                    break
+
+            # Cleanup partial if all retries fail
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+
+        except Exception as e:
+            logger.error(f"[HTTPX Outer Error] {e!r}")
+
+        # 2️⃣ Fallback to yt-dlp (original logic)
+        try:
+            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
+                info = await asyncio.to_thread(ydl.extract_info, url, download=False)
+                if 'entries' in info:
+                    info = info['entries'][0]
+
+                parsed_info_url = urlparse(info.get('url', url))
+                file_extension = os.path.splitext(parsed_info_url.path)[1]
+
+                if not file_extension:
+                    content_type = info.get('http_headers', {}).get('Content-Type')
+                    if content_type:
+                        file_extension = mimetypes.guess_extension(content_type)
+                    if not file_extension:
+                        file_extension = '.unknown'
+
+                filename = ydl.prepare_filename(info)
+                new_filename = os.path.splitext(filename)[0] + file_extension
+
+                if os.path.exists(filename):
+                    os.rename(filename, new_filename)
+                    return new_filename
+
+                await asyncio.to_thread(ydl.download, [url])
+
+                if os.path.exists(filename):
+                    os.rename(filename, new_filename)
+
+                return new_filename
+
+        except yt_dlp.utils.DownloadError as e:
+            logger.error(f"YT-DLP Download Error: {str(e)}")
+            return await self.direct_download(url)
+
+    except Exception as e:
+        logger.error(f"YT-DLP General Error: {str(e)}")
+        return None
+        
+
+
+    async def ytdl_download_old(self, url: str) -> Optional[str]:
         try:
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
                 info = await asyncio.to_thread(ydl.extract_info, url, download=False) 
